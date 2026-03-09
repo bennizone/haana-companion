@@ -35,6 +35,7 @@
   --sp-5: 20px;
   --sp-6: 24px;
   --sp-8: 32px;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1170,6 +1171,7 @@ header h1 span { color: var(--accent2); }
   --radius-lg:  12px;
   --radius-xl:  16px;
   font-family: Roboto, "Noto Sans", system-ui, sans-serif;
+  color-scheme: dark;
 }
 
 :root.ha-theme header {
@@ -1219,6 +1221,7 @@ header h1 span { color: var(--accent2); }
   --glass-hi:   rgba(0,0,0,.04);
   --shadow-sm:  0 1px 3px rgba(0,0,0,.12);
   --shadow-md:  0 4px 12px rgba(0,0,0,.12);
+  color-scheme: light;
 }
 
 :root.ha-theme.ha-theme-light body {

@@ -594,6 +594,25 @@ async function fetchModelsForLlm(i) {
     datalist.innerHTML = d.models.map(m => `<option value="${escAttr(m)}">`).join('');
     st.textContent = d.fallback ? '\u2713 ' + d.models.length + ' ' + t('config_llm.known_models') : '\u2713 ' + d.models.length + ' ' + t('config_llm.models_label');
     st.style.color = d.fallback ? 'var(--yellow)' : 'var(--green)';
+    // Pre-fill model input with first model if still empty
+    const modelInput = document.getElementById(`llm-${i}-model`);
+    if (modelInput && !modelInput.value) {
+      modelInput.value = d.models[0];
+    }
+    // Render clickable model pills
+    let pillsEl = document.getElementById(`llm-${i}-model-pills`);
+    if (!pillsEl) {
+      pillsEl = document.createElement('div');
+      pillsEl.id = `llm-${i}-model-pills`;
+      pillsEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;';
+      datalist.parentElement.insertBefore(pillsEl, datalist.nextSibling);
+    }
+    const currentVal = modelInput ? modelInput.value : d.models[0];
+    pillsEl.innerHTML = d.models.slice(0, 8).map(m =>
+      `<span onclick="(function(el){document.getElementById('llm-${i}-model').value=el.dataset.m;document.querySelectorAll('#llm-${i}-model-pills span').forEach(s=>s.style.background='');el.style.background='var(--accent-dim)';})(this)"
+       data-m="${escAttr(m)}"
+       style="padding:2px 8px;border:1px solid var(--border);border-radius:12px;font-size:11px;cursor:pointer;background:${currentVal===m?'var(--accent-dim)':'var(--surface-hi)'};color:var(--text);">${escHtml(m)}</span>`
+    ).join('');
   } catch(e) {
     st.textContent = '\u2717 ' + e.message.substring(0,40);
     st.style.color = 'var(--red)';
