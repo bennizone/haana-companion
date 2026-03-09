@@ -48,5 +48,6 @@ fi
 export HA_URL="http://supervisor/core"
 export HA_TOKEN="${SUPERVISOR_TOKEN}"
 
+export PYTHONPATH="/app"
 cd /app/admin-interface
 exec python3 -m uvicorn main:app --host 0.0.0.0 --port 8080

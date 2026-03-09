@@ -16,7 +16,7 @@ ARG TARGETARCH
 RUN if [ "$TARGETARCH" = "amd64" ]; then ARCH="x86_64"; \
     elif [ "$TARGETARCH" = "arm64" ]; then ARCH="aarch64"; \
     else ARCH="x86_64"; fi && \
-    curl -fsSL "https://github.com/qdrant/qdrant/releases/download/v${QDRANT_VERSION}/qdrant-${ARCH}-unknown-linux-gnu.tar.gz" \
+    curl -fsSL "https://github.com/qdrant/qdrant/releases/download/v${QDRANT_VERSION}/qdrant-${ARCH}-unknown-linux-musl.tar.gz" \
     | tar -xz -C /usr/local/bin/ qdrant
 
 # Python-Abhaengigkeiten
