@@ -14,7 +14,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-REPO_ROOT = Path(os.environ.get("HAANA_REPO_ROOT", "/opt/haana"))
+REPO_ROOT = Path(os.environ.get("HAANA_REPO_ROOT", "/data"))
 
 
 def _run(args: list, timeout: int = 30) -> subprocess.CompletedProcess:
@@ -33,8 +33,22 @@ def _mask_output(text: str) -> str:
     return re.sub(r'https?://[^@\s/]+@', 'https://***@', text)
 
 
+def _is_git_repo() -> bool:
+    """Prüft ob REPO_ROOT existiert und ein Git-Repository ist."""
+    if not REPO_ROOT.exists():
+        return False
+    result = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "rev-parse", "--git-dir"],
+        capture_output=True, text=True, timeout=5,
+    )
+    return result.returncode == 0
+
+
 async def git_status() -> dict:
     """Gibt Branch, dirty-Status, ahead/behind und Remote-URL zurück."""
+    if not _is_git_repo():
+        return {"branch": None, "dirty": False, "ahead": 0, "behind": 0, "remote": None, "configured": False}
+
     loop = asyncio.get_running_loop()
 
     def _collect():
@@ -82,6 +96,9 @@ async def git_status() -> dict:
 
 async def git_pull() -> dict:
     """Führt git pull aus und gibt den Output zurück."""
+    if not _is_git_repo():
+        return {"ok": False, "output": "Kein Git-Repository konfiguriert"}
+
     loop = asyncio.get_running_loop()
 
     def _do_pull():
@@ -95,6 +112,9 @@ async def git_pull() -> dict:
 
 async def git_push() -> dict:
     """Führt git push aus und gibt den Output zurück."""
+    if not _is_git_repo():
+        return {"ok": False, "output": "Kein Git-Repository konfiguriert"}
+
     loop = asyncio.get_running_loop()
 
     def _do_push():
@@ -146,6 +166,9 @@ async def git_connect(url: str, token: str, load_config_fn, save_config_fn) -> d
 
 async def git_log() -> list:
     """Gibt die letzten 10 Commits zurück."""
+    if not _is_git_repo():
+        return []
+
     loop = asyncio.get_running_loop()
 
     def _get_log():

@@ -549,14 +549,14 @@ def _resolve_llm(llm_id: str, cfg: dict) -> tuple[dict, dict]:
     llm = next((l for l in cfg.get("llms", []) if l["id"] == llm_id), {})
     if not llm:
         return {}, {}
-    provider = next((p for p in cfg.get("providers", []) if p["id"] == llm.get("provider_id")), {})
+    provider = next((p for p in cfg.get("providers", []) if p.get("id") == llm.get("provider_id")), {})
     return llm, provider
 
 
 def _find_ollama_url(cfg: dict) -> str:
     """Findet die Ollama-URL aus Providern: Embedding → Extraction → erster Ollama."""
     emb = cfg.get("embedding", {})
-    emb_prov = next((p for p in cfg.get("providers", []) if p["id"] == emb.get("provider_id")), {})
+    emb_prov = next((p for p in cfg.get("providers", []) if p.get("id") == emb.get("provider_id")), {})
     if emb_prov.get("type") == "ollama" and emb_prov.get("url"):
         return emb_prov["url"]
 
@@ -869,7 +869,16 @@ async def delete_logs(request: Request):
 
 @app.get("/api/config")
 async def get_config():
-    return load_config()
+    cfg = load_config()
+    # Im Addon-Modus: HA URL und Token aus Env-Vars befüllen wenn leer
+    supervisor_token = os.environ.get("SUPERVISOR_TOKEN", "")
+    ha_url_env = os.environ.get("HA_URL", "")
+    svc = cfg.setdefault("services", {})
+    if not svc.get("ha_url") and ha_url_env:
+        svc["ha_url"] = ha_url_env
+    if not svc.get("ha_token") and supervisor_token:
+        svc["ha_token"] = supervisor_token
+    return cfg
 
 
 @app.post("/api/config")
@@ -1627,6 +1636,8 @@ async def test_ha(request: Request):
 
     ha_url   = (body.get("ha_url")   or "").rstrip("/")
     ha_token = (body.get("ha_token") or "").strip()
+    ha_url   = ha_url   or os.environ.get("HA_URL", "").rstrip("/")
+    ha_token = ha_token or os.environ.get("SUPERVISOR_TOKEN", "")
     if not ha_url:
         return {"ok": False, "detail": "ha_url fehlt"}
     if not ha_token:
@@ -1663,6 +1674,7 @@ async def test_ha_mcp(request: Request):
 
     mcp_url = (body.get("mcp_url") or "").strip()
     token   = (body.get("token")   or "").strip()
+    token   = token or os.environ.get("SUPERVISOR_TOKEN", "")
 
     if not mcp_url:
         return {"ok": False, "detail": "MCP URL fehlt"}
