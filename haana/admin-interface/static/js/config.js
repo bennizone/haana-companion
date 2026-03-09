@@ -573,49 +573,41 @@ function onLlmProviderChange(i) {
 }
 
 async function fetchModelsForLlm(i) {
-  if (!cfg) return;
-  const providerId = document.getElementById(`llm-${i}-provider`)?.value;
-  const prov = (cfg.providers || []).find(p => p.id === providerId);
-  if (!prov) return;
   const st = document.getElementById(`llm-${i}-models-status`);
-  st.textContent = '\u2026';
   try {
+    if (!cfg) { if (st) { st.textContent = '⚠ Config nicht geladen'; st.style.color = 'var(--yellow)'; } return; }
+    const providerId = document.getElementById(`llm-${i}-provider`)?.value;
+    const prov = (cfg.providers || []).find(p => p.id === providerId);
+    if (!prov) { if (st) { st.textContent = '⚠ Kein Provider ausgewählt'; st.style.color = 'var(--yellow)'; } return; }
+    if (st) { st.textContent = '\u2026'; st.style.color = 'var(--muted)'; }
     const r = await fetch('/api/fetch-models', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ type: prov.type, url: prov.url, key: prov.key }),
     });
     const d = await r.json();
     if (d.manual || !d.models?.length) {
-      st.textContent = d.error ? '\u26a0 ' + d.error.substring(0,60) : '\u26a0 ' + t('config_llm.no_models_manual');
-      st.style.color = 'var(--yellow)';
+      if (st) { st.textContent = d.error ? '\u26a0 ' + d.error.substring(0,60) : '\u26a0 ' + t('config_llm.no_models_manual'); st.style.color = 'var(--yellow)'; }
       return;
     }
-    const datalist = document.getElementById(`llmmodels-${i}`);
-    datalist.innerHTML = d.models.map(m => `<option value="${escAttr(m)}">`).join('');
-    st.textContent = d.fallback ? '\u2713 ' + d.models.length + ' ' + t('config_llm.known_models') : '\u2713 ' + d.models.length + ' ' + t('config_llm.models_label');
-    st.style.color = d.fallback ? 'var(--yellow)' : 'var(--green)';
-    // Zeige Modell-Auswahl-Modal
+    if (st) { st.textContent = '\u2713 ' + d.models.length + ' Modelle'; st.style.color = 'var(--green)'; }
     const modelInput = document.getElementById(`llm-${i}-model`);
     const currentVal = modelInput?.value || '';
     Modal.show({
-      title: t('config_llm.models_label') || 'Modell wählen',
+      title: 'Modell wählen',
       body: `<div style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;">
         ${d.models.map(m => `
-          <div onclick="document.getElementById('llm-${i}-model').value='${escAttr(m)}';Modal.hide();"
+          <div onclick="document.getElementById('llm-${i}-model').value='${escAttr(m)}';Modal.close();"
                style="padding:10px 14px;border:1px solid ${m===currentVal?'var(--accent)':'var(--border)'};
                       border-radius:var(--radius);cursor:pointer;background:${m===currentVal?'var(--accent-dim)':'var(--surface-hi)'};
-                      color:var(--text);font-size:13px;"
-               onmouseover="this.style.borderColor='var(--accent)'"
-               onmouseout="this.style.borderColor='${m===currentVal?'var(--accent)':'var(--border)'}'">
-            ${escHtml(m)}${m===currentVal?' <span style="color:var(--accent);font-size:11px;">✓ aktuell</span>':''}
+                      color:var(--text);font-size:13px;">
+            ${escHtml(m)}${m===currentVal?' <span style="color:var(--accent);font-size:11px;">✓</span>':''}
           </div>`).join('')}
       </div>`,
-      hideConfirm: true,
-      cancelText: t('common.cancel') || 'Abbrechen',
+      hideCancel: false,
+      cancelText: 'Schließen',
     });
   } catch(e) {
-    st.textContent = '\u2717 ' + e.message.substring(0,40);
-    st.style.color = 'var(--red)';
+    if (st) { st.textContent = '\u2717 ' + e.message.substring(0,60); st.style.color = 'var(--red)'; }
   }
 }
 
