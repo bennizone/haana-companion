@@ -30,7 +30,8 @@ RUN pip3 install --no-cache-dir --break-system-packages \
 COPY core/ /app/core/
 COPY admin-interface/ /app/admin-interface/
 COPY skills/ /app/skills/
-COPY instanzen/ /app/instanzen/
+RUN mkdir -p /app/instanzen/templates
+COPY instanzen/templates/ /app/instanzen/templates/
 
 # S6 Service-Definitionen
 COPY haana-addons/haana/rootfs/ /
