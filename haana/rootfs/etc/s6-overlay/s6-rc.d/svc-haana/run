@@ -1,0 +1,52 @@
+#!/command/with-contenv bashio
+# HAANA Admin Interface + In-Process Agents
+
+bashio::log.info "Starting HAANA..."
+
+# Warte bis Qdrant bereit ist
+for i in $(seq 1 30); do
+    if curl -sf http://localhost:6333/healthz > /dev/null 2>&1; then
+        bashio::log.info "Qdrant ready"
+        break
+    fi
+    sleep 1
+done
+
+# Daten-Verzeichnisse anlegen
+mkdir -p /data/config /data/context /data/instanzen /data/claude-auth
+mkdir -p /media/haana/logs/conversations
+mkdir -p /media/haana/logs/memory-ops
+mkdir -p /media/haana/logs/tool-calls
+mkdir -p /media/haana/logs/llm-calls
+
+# Templates aus Image kopieren (nur wenn nicht vorhanden)
+if [ ! -d /data/instanzen/templates ]; then
+    cp -r /app/instanzen/templates /data/instanzen/templates
+    bashio::log.info "Templates nach /data/instanzen/templates kopiert"
+fi
+
+# Env-Vars aus HA Add-on Options
+export HAANA_MODE="addon"
+export HAANA_DATA_DIR="/data"
+export HAANA_LOG_DIR="/media/haana/logs"
+export HAANA_CONF_FILE="/data/config/config.json"
+export HAANA_INST_DIR="/data/instanzen"
+export QDRANT_URL="http://localhost:6333"
+
+# Optionale Config aus HA Options
+if bashio::config.has_value 'anthropic_api_key'; then
+    export ANTHROPIC_API_KEY="$(bashio::config 'anthropic_api_key')"
+fi
+if bashio::config.has_value 'ollama_url'; then
+    export OLLAMA_URL="$(bashio::config 'ollama_url')"
+fi
+if bashio::config.has_value 'ha_mcp_url'; then
+    export HA_MCP_URL="$(bashio::config 'ha_mcp_url')"
+fi
+
+# HA Supervisor Token fuer API-Zugriff
+export HA_URL="http://supervisor/core"
+export HA_TOKEN="${SUPERVISOR_TOKEN}"
+
+cd /app/admin-interface
+exec python3 -m uvicorn main:app --host 0.0.0.0 --port 8080

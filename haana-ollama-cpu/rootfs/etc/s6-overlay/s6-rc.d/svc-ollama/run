@@ -1,0 +1,47 @@
+#!/command/with-contenv bashio
+# Ollama Server (CPU-only) with model auto-pull
+
+EMBEDDING_MODEL="$(bashio::config 'embedding_model')"
+LLM_MODEL="$(bashio::config 'llm_model')"
+
+bashio::log.info "Starting Ollama (CPU-only)..."
+
+# Modelle persistent in /data speichern (HA Backup)
+export OLLAMA_MODELS="/data/models"
+mkdir -p /data/models
+
+# Auf allen Interfaces lauschen (damit HAANA-Container zugreifen kann)
+export OLLAMA_HOST="0.0.0.0"
+
+# Ollama im Hintergrund starten
+ollama serve &
+OLLAMA_PID=$!
+
+# Warten bis Ollama bereit ist
+for i in $(seq 1 60); do
+    if curl -sf http://localhost:11434/api/tags > /dev/null 2>&1; then
+        bashio::log.info "Ollama ready"
+        break
+    fi
+    sleep 1
+done
+
+# Modelle pullen falls nicht vorhanden
+if ! ollama list | grep -q "${EMBEDDING_MODEL}"; then
+    bashio::log.info "Pulling embedding model: ${EMBEDDING_MODEL}..."
+    bashio::log.info "This may take a few minutes on first start."
+    ollama pull "${EMBEDDING_MODEL}"
+fi
+
+if ! ollama list | grep -q "${LLM_MODEL}"; then
+    bashio::log.info "Pulling LLM model: ${LLM_MODEL}..."
+    bashio::log.info "This may take a few minutes on first start."
+    ollama pull "${LLM_MODEL}"
+fi
+
+bashio::log.info "Models ready. Ollama serving on port 11434."
+bashio::log.info "Embedding: ${EMBEDDING_MODEL}, LLM: ${LLM_MODEL}"
+bashio::log.info "Note: CPU inference is slow but works for async tasks (embeddings, memory extraction)."
+
+# Warte auf Ollama-Prozess
+wait ${OLLAMA_PID}

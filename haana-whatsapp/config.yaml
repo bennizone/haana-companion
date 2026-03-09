@@ -1,0 +1,19 @@
+name: "HAANA WhatsApp"
+description: "WhatsApp bridge for HAANA chat"
+version: "0.1.0"
+slug: "haana-whatsapp"
+url: "https://github.com/benpro-haana/haana-addons"
+arch:
+  - amd64
+  - aarch64
+init: false
+ports:
+  3001/tcp: 3001
+ports_description:
+  3001/tcp: "WhatsApp Bridge API"
+options:
+  haana_url: "http://haana:8080"
+schema:
+  haana_url: "url"
+startup: "application"
+boot: "manual"

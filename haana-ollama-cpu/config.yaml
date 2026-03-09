@@ -1,0 +1,21 @@
+name: "HAANA Local LLM (CPU)"
+description: "CPU-only Ollama for HAANA embeddings and memory extraction"
+version: "0.1.0"
+slug: "haana-ollama-cpu"
+url: "https://github.com/benpro-haana/haana-addons"
+arch:
+  - amd64
+  - aarch64
+init: false
+ports:
+  11434/tcp: 11434
+ports_description:
+  11434/tcp: "Ollama API"
+options:
+  embedding_model: "nomic-embed-text"
+  llm_model: "qwen3:0.6b"
+schema:
+  embedding_model: "list(nomic-embed-text|all-minilm|bge-m3)"
+  llm_model: "list(qwen3:0.6b|qwen3:1.7b)"
+startup: "system"
+boot: "auto"
