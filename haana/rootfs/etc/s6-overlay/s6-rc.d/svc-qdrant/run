@@ -5,6 +5,8 @@ bashio::log.info "Starting Qdrant..."
 
 mkdir -p /data/qdrant
 
-exec /usr/local/bin/qdrant \
-    --storage-path /data/qdrant \
-    2>&1
+export QDRANT__STORAGE__STORAGE_PATH="/data/qdrant"
+export QDRANT__SERVICE__HTTP_PORT="6333"
+export QDRANT__TELEMETRY_DISABLED="true"
+
+exec /usr/local/bin/qdrant 2>&1
