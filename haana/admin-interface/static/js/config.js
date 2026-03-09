@@ -604,8 +604,9 @@ async function fetchModelsForLlm(i) {
     if (!pillsEl) {
       pillsEl = document.createElement('div');
       pillsEl.id = `llm-${i}-model-pills`;
-      pillsEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;';
-      datalist.parentElement.insertBefore(pillsEl, datalist.nextSibling);
+      pillsEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;';
+      const formRow = datalist.parentElement;
+      formRow.parentElement.insertBefore(pillsEl, formRow.nextSibling);
     }
     const currentVal = modelInput ? modelInput.value : d.models[0];
     pillsEl.innerHTML = d.models.slice(0, 8).map(m =>
