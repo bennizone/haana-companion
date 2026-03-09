@@ -34,6 +34,6 @@ RUN mkdir -p /app/instanzen/templates
 COPY instanzen/templates/ /app/instanzen/templates/
 
 # S6 Service-Definitionen
-COPY haana-addons/haana/rootfs/ /
+COPY rootfs/ /
 
 WORKDIR /app/admin-interface

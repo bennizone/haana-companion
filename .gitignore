@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Grosse Dateien / Binaries
+haana/admin-interface/static/lib/
+haana/admin-interface/__pycache__/
+haana/core/__pycache__/

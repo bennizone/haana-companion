@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HAANA Admin</title>
+<link rel="stylesheet" href="/static/css/admin.css?v=8">
+<link rel="stylesheet" href="/static/lib/xterm.css">
+<link rel="stylesheet" href="/static/css/terminal.css?v=1">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ LOGIN OVERLAY -->
+<div id="login-overlay" class="wizard-overlay" style="display:none;">
+  <div class="wizard-container" style="max-width:420px;">
+    <div class="wizard-header">
+      <div class="wizard-logo">HAANA</div>
+      <div class="wizard-subtitle" data-i18n="auth.login_title">Anmeldung</div>
+    </div>
+    <div class="wizard-content" style="padding:32px 32px 24px;">
+      <p class="form-hint" style="margin-bottom:20px;" data-i18n="auth.standalone_hint">
+        Den Admin-Token findest du beim ersten Start in den HAANA-Logs.
+      </p>
+      <div class="form-group" style="margin-bottom:16px;">
+        <input type="password" id="login-token-input"
+               data-i18n-placeholder="auth.token_placeholder"
+               placeholder="Admin-Token eingeben..."
+               style="width:100%;padding:10px 14px;font-size:14px;"
+               onkeydown="if(event.key==='Enter') loginSubmit()">
+      </div>
+      <div id="login-error" style="color:var(--red);font-size:13px;margin-bottom:12px;display:none;"
+           data-i18n="auth.error_invalid_token">Ungültiger Token.</div>
+      <button class="btn btn-primary" style="width:100%;" onclick="loginSubmit()"
+              data-i18n="auth.login_btn">Anmelden</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════ SETUP WIZARD OVERLAY -->
+<div id="wizard-overlay" class="wizard-overlay" style="display:none;">
+  <div class="wizard-container">
+    <!-- Header -->
+    <div class="wizard-header">
+      <div class="wizard-logo">HAANA</div>
+      <div class="wizard-subtitle" data-i18n="wizard.setup_title">Einrichtung</div>
+    </div>
+
+    <!-- Step Indicator -->
+    <div class="wizard-steps">
+      <div class="wizard-step wizard-step-active" id="wiz-step-1">
+        <div class="wizard-step-num">1</div>
+        <div class="wizard-step-label" data-i18n="wizard.step1_label">KI-Dienste</div>
+      </div>
+      <div class="wizard-step-connector"></div>
+      <div class="wizard-step" id="wiz-step-2">
+        <div class="wizard-step-num">2</div>
+        <div class="wizard-step-label" data-i18n="wizard.step2_label">Haushalt</div>
+      </div>
+      <div class="wizard-step-connector"></div>
+      <div class="wizard-step" id="wiz-step-3">
+        <div class="wizard-step-num">3</div>
+        <div class="wizard-step-label" data-i18n="wizard.step3_label">Extras</div>
+      </div>
+    </div>
+
+    <!-- Step Content -->
+    <div id="wizard-content" class="wizard-content">
+      <!-- filled by wizard.js -->
+    </div>
+
+    <!-- Navigation -->
+    <div class="wizard-nav" id="wizard-nav">
+      <button class="btn btn-secondary" id="wiz-back-btn" style="display:none;"
+              onclick="_wizGoTo(_wizState.step - 1)" data-i18n="wizard.back">
+        &#8592; Zurück
+      </button>
+      <div style="flex:1;"></div>
+      <button class="btn btn-primary" id="wiz-next-btn" disabled
+              onclick="_wizGoTo(_wizState.step + 1)" data-i18n="wizard.next">
+        Weiter &#8594;
+      </button>
+      <button class="btn btn-primary" id="wiz-finish-btn" style="display:none;"
+              onclick="wizFinish()" data-i18n="wizard.finish">
+        HAANA starten &#10003;
+      </button>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div class="status-dot" id="header-dot" title="System-Status"></div>
+  <h1>HAANA <span>Admin</span></h1>
+  <span class="header-status" id="header-status">Verbinde...</span>
+  <button class="btn btn-secondary btn-sm" id="wizard-restart-btn"
+          onclick="openWizardRestartModal()"
+          data-i18n="wizard.restart_btn"
+          style="margin-left:auto;font-size:12px;padding:4px 10px;">
+    &#9881; Einrichtung
+  </button>
+  <select class="header-lang" id="lang-selector" onchange="I18n.load(this.value)">
+    <option value="de">DE</option>
+    <option value="en">EN</option>
+  </select>
+</header>
+
+<!-- ══════════════════════════════════════════ WIZARD RESTART MODAL -->
+<div id="wizard-restart-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9000;align-items:center;justify-content:center;">
+  <div style="background:var(--bg-card);border-radius:var(--radius);padding:var(--sp-6);max-width:440px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+    <h3 style="margin:0 0 var(--sp-4);font-size:16px;" data-i18n="wizard.restart_title">Einrichtung anpassen</h3>
+
+    <!-- Option: Extend -->
+    <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:var(--sp-4);margin-bottom:var(--sp-3);cursor:pointer;"
+         onclick="wizardRestartExtend()">
+      <div style="font-weight:600;margin-bottom:4px;">
+        &#10133; <span data-i18n="wizard.mode_extend">Konfiguration erweitern</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);" data-i18n="wizard.restart_extend_desc">
+        Weitere Provider, Benutzer oder LLMs hinzufügen
+      </div>
+    </div>
+
+    <!-- Option: Fresh -->
+    <div style="border:1px solid var(--red);border-radius:var(--radius-sm);padding:var(--sp-4);margin-bottom:var(--sp-5);cursor:pointer;"
+         onclick="wizardRestartFreshConfirm()">
+      <div style="font-weight:600;margin-bottom:4px;color:var(--red);">
+        &#9888; <span data-i18n="wizard.mode_fresh">Neu einrichten</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);" data-i18n="wizard.restart_fresh_desc">
+        Alles zurücksetzen und von vorne beginnen
+      </div>
+    </div>
+
+    <!-- Confirm fresh warning (hidden initially) -->
+    <div id="wizard-restart-fresh-confirm" style="display:none;background:color-mix(in srgb,var(--red) 12%,transparent);border:1px solid var(--red);border-radius:var(--radius-sm);padding:var(--sp-3);margin-bottom:var(--sp-4);">
+      <div style="font-size:13px;color:var(--red);font-weight:600;margin-bottom:var(--sp-2);" data-i18n="wizard.restart_fresh_warning">
+        Achtung: Alle Provider, Benutzer und LLMs werden gelöscht!
+      </div>
+      <div style="display:flex;gap:var(--sp-2);">
+        <button class="btn btn-danger btn-sm" onclick="wizardRestartFreshConfirmed()" data-i18n="wizard.mode_fresh">Neu einrichten</button>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('wizard-restart-fresh-confirm').style.display='none'" data-i18n="common.cancel">Abbrechen</button>
+      </div>
+    </div>
+
+    <div style="text-align:right;">
+      <button class="btn btn-secondary btn-sm" onclick="closeWizardRestartModal()" data-i18n="common.cancel">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="showTab('conversations', event)" data-i18n="tabs.conversations">Konversationen</button>
+  <button class="tab-btn" onclick="showTab('config', event)" data-i18n="tabs.config">Config</button>
+  <button class="tab-btn" onclick="showTab('users', event)" data-i18n="tabs.users">Users</button>
+  <button class="tab-btn" onclick="showTab('status', event)" data-i18n="tabs.status">Status</button>
+  <button class="tab-btn" onclick="showTab('terminal', event)" data-i18n="terminal.tab">Entwicklung</button>
+</div>
+
+<!-- ══════════════════════════════════════════ CONVERSATIONS (Chat + Logs) -->
+<div id="panel-conversations" class="panel active">
+
+  <!-- ── Unified Instance Tabs ── -->
+  <div class="conv-inst-tabs" id="conv-inst-tabs">
+    <button class="conv-inst-tab" data-inst="__all__"
+            onclick="selectInstance('__all__')" data-i18n="logs.tabs.all">Alle</button>
+    {% for inst in instances %}
+    <button class="conv-inst-tab" data-inst="{{ inst }}"
+            onclick="selectInstance('{{ inst }}')">{{ inst }}</button>
+    {% endfor %}
+  </div>
+
+  <!-- ── Top bar: View toggle + Live indicators + Limit selector ── -->
+  <div class="conv-top-bar">
+    <!-- View Mode Toggle -->
+    <div class="view-toggle">
+      <button class="view-toggle-btn active" data-mode="live"
+              onclick="switchViewMode('live')" data-i18n="chat.view_live">Live</button>
+      <button class="view-toggle-btn" data-mode="archiv"
+              onclick="switchViewMode('archiv')" data-i18n="chat.view_archiv">Archiv</button>
+    </div>
+
+    <!-- Live mode extras -->
+    <div class="conv-limit-wrap">
+      <div class="limit-selector">
+        <label data-i18n="chat.last">Letzte</label>
+        <select id="conv-limit" onchange="loadConversations(currentInstance)">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+        </select>
+      </div>
+      <div class="live-bar">
+        <div class="live-dot offline" id="live-dot"></div>
+        <span id="live-label">Live</span>
+        <span id="agent-status" class="agent-status"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Rebuild-Banner ── -->
+  <div id="rebuild-banner" class="rebuild-banner">
+    <span class="rebuild-banner-text" data-i18n="chat.rebuild_banner">Qdrant ist leer – Memory kann aus Konversations-Logs neu aufgebaut werden.</span>
+    <div class="rebuild-banner-actions">
+      <button class="btn btn-sm btn-secondary" onclick="showTab('config');scrollToRebuild()" data-i18n="chat.rebuild_now">Jetzt rebuilden</button>
+      <button class="btn btn-sm btn-secondary" onclick="document.getElementById('rebuild-banner').classList.remove('active')">&#10005;</button>
+    </div>
+  </div>
+
+  <!-- ── Chat-Eingabe (hidden for "Alle") ── -->
+  <div class="chat-box">
+    <div class="chat-input-row">
+      <textarea id="chat-input" class="chat-input"
+        data-i18n-placeholder="chat.placeholder"
+        placeholder="Nachricht an HAANA... (Enter senden, Shift+Enter Zeilenumbruch)"
+        rows="2"
+        onkeydown="handleChatKey(event)"
+      ></textarea>
+      <button class="btn btn-primary chat-send-btn" id="send-btn" onclick="sendChat()" data-i18n="chat.send_btn">
+        Senden &#8629;
+      </button>
+    </div>
+    <div id="chat-status" class="chat-status"></div>
+  </div>
+
+  <!-- ── Archiv toolbar + filter (hidden in live mode) ── -->
+  <div class="conv-archiv-toolbar" id="conv-archiv-toolbar" style="display:none;">
+    <div class="log-toolbar-actions" id="log-toolbar-actions" style="display:none;">
+      <button class="btn btn-sm btn-secondary" id="log-export-btn"
+              onclick="logExportUser()" data-i18n="logs.user.export">Export (ZIP)</button>
+      <button class="btn btn-sm btn-secondary" id="log-check-btn"
+              onclick="logCheckRebuild()" data-i18n="logs.user.check_rebuild">Änderungen prüfen</button>
+      <button class="btn btn-sm btn-danger" id="log-delete-all-btn"
+              onclick="logDeleteAllUser()" data-i18n="logs.user.delete_all">Alle Daten löschen</button>
+    </div>
+    <!-- Date filter -->
+    <div class="log-filter-bar">
+      <div class="log-date-range">
+        <label class="log-filter-label" data-i18n="logs.filter.from">Von</label>
+        <input type="date" id="log-date-from" class="log-date-input" onchange="applyLogFilters()">
+        <label class="log-filter-label" data-i18n="logs.filter.to">Bis</label>
+        <input type="date" id="log-date-to" class="log-date-input" onchange="applyLogFilters()">
+      </div>
+      <div class="log-quick-filters">
+        <button class="log-quick-btn active" data-range="all" onclick="setLogDateRange('all')" data-i18n="logs.filter.all">Alles</button>
+        <button class="log-quick-btn" data-range="today" onclick="setLogDateRange('today')" data-i18n="logs.filter.today">Heute</button>
+        <button class="log-quick-btn" data-range="7" onclick="setLogDateRange('7')" data-i18n="logs.filter.7days">7 Tage</button>
+        <button class="log-quick-btn" data-range="30" onclick="setLogDateRange('30')" data-i18n="logs.filter.30days">30 Tage</button>
+      </div>
+      <div class="log-search-wrap">
+        <svg class="log-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="8.5" cy="8.5" r="5.5"/><line x1="13" y1="13" x2="18" y2="18"/>
+        </svg>
+        <input type="text" id="log-search" class="log-search-input"
+               placeholder="Logs durchsuchen..."
+               data-i18n-placeholder="logs.filter.search"
+               oninput="debounceLogSearch()">
+      </div>
+    </div>
+    <!-- Check-rebuild result banner -->
+    <div id="log-check-result" class="log-check-banner" style="display:none;"></div>
+  </div>
+
+  <!-- ── Live content ── -->
+  <!-- "select instance" hint for "Alle" in live mode -->
+  <div id="conv-select-hint" class="empty-state" style="display:none;">
+    <div class="icon">&#8594;</div>
+    <div data-i18n="chat.select_instance">Instanz auswählen um den Chat zu nutzen</div>
+  </div>
+
+  <div id="conv-list" style="display:flex;flex-direction:column;gap:var(--sp-3);">
+    <div class="empty-state">
+      <div class="icon">&#8230;</div>
+      <div data-i18n="chat.loading">Konversationen werden geladen...</div>
+    </div>
+  </div>
+
+  <!-- ── Archiv content (day-accordion) ── -->
+  <div id="log-day-list" style="display:none;">
+    <div class="empty-state">
+      <div class="icon">&#8230;</div>
+      <div data-i18n="logs.loading">Logs werden geladen...</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ CONFIG -->
+<div id="panel-config" class="panel" style="padding:0;">
+
+  <!-- Config Sub-Tabs -->
+  <div class="cfg-tabs">
+    <button class="cfg-tab-btn active" onclick="showCfgTab('providers')"  id="cfgtab-providers" data-i18n="config.sub_tabs.providers">Providers</button>
+    <button class="cfg-tab-btn"        onclick="showCfgTab('llms')"       id="cfgtab-llms" data-i18n="config.sub_tabs.llms">LLMs</button>
+    <button class="cfg-tab-btn"        onclick="showCfgTab('memory')"     id="cfgtab-memory" data-i18n="config.sub_tabs.memory">Memory</button>
+    <button class="cfg-tab-btn"        onclick="showCfgTab('ha')"         id="cfgtab-ha" data-i18n="config.sub_tabs.home_assistant">Home Assistant</button>
+    <button class="cfg-tab-btn"        onclick="showCfgTab('whatsapp')"   id="cfgtab-whatsapp" data-i18n="config.sub_tabs.whatsapp">WhatsApp</button>
+    <button class="cfg-tab-btn"        onclick="showCfgTab('infra')"      id="cfgtab-infra" data-i18n="config.sub_tabs.infra">Infra</button>
+    <button class="cfg-tab-btn"        onclick="showCfgTab('logs')"       id="cfgtab-logs" data-i18n="config.sub_tabs.retention">Retention</button>
+  </div>
+
+  <!-- ── Sub-Tab: Providers ── -->
+  <div id="cfgpanel-providers" class="cfg-tab-panel">
+    <div class="config-section">
+      <div class="config-section-header" data-i18n="config_provider.title">Provider-Konfiguration</div>
+      <div class="config-section-body" id="provider-list">
+        <!-- Wird per JS befüllt -->
+      </div>
+    </div>
+    <div class="cfg-section-save-bar">
+      <button class="btn btn-primary" id="save-btn-providers" onclick="saveSectionProviders()">
+        <span data-i18n="config.section_save">Speichern</span>
+      </button>
+      <button class="btn btn-secondary" onclick="resetSectionProviders()">
+        <span data-i18n="config.section_reset">&#8635; Zurücksetzen</span>
+      </button>
+      <span id="save-status-providers" class="cfg-section-save-status"></span>
+    </div>
+  </div>
+
+  <!-- ── Sub-Tab: LLMs ── -->
+  <div id="cfgpanel-llms" class="cfg-tab-panel" style="display:none;">
+    <div class="config-section">
+      <div class="config-section-header" data-i18n="config_llm.title">LLM-Konfiguration</div>
+      <div class="config-section-body" id="llm-list">
+        <!-- Wird per JS befüllt -->
+      </div>
+    </div>
+    <div class="cfg-section-save-bar">
+      <button class="btn btn-primary" id="save-btn-llms" onclick="saveSectionLlms()">
+        <span data-i18n="config.section_save">Speichern</span>
+      </button>
+      <button class="btn btn-secondary" onclick="resetSectionLlms()">
+        <span data-i18n="config.section_reset">&#8635; Zurücksetzen</span>
+      </button>
+      <span id="save-status-llms" class="cfg-section-save-status"></span>
+    </div>
+  </div>
+
+  <!-- ── Sub-Tab: Memory ── -->
+  <div id="cfgpanel-memory" class="cfg-tab-panel" style="display:none;">
+
+    <!-- Memory Settings -->
+    <div class="config-section">
+      <div class="config-section-header" data-i18n="config_memory.window_title">Sliding Window</div>
+      <div class="config-section-body">
+        <div class="form-row three">
+          <div class="form-group">
+            <label>Window-Größe (Nachrichten)</label>
+            <input type="number" id="mem-window-size" min="5" max="100" value="20">
+          </div>
+          <div class="form-group">
+            <label>Window-Alter (Minuten)</label>
+            <input type="number" id="mem-window-minutes" min="10" max="1440" value="60">
+          </div>
+          <div class="form-group">
+            <label>Minimum (immer aktiv)</label>
+            <input type="number" id="mem-min-messages" min="1" max="20" value="5">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Extraction LLM (Global) -->
+    <div class="config-section">
+      <div class="config-section-header" data-i18n="config_memory.extraction_llm">Extraktions-LLM</div>
+      <div class="config-section-body">
+        <p class="form-hint" style="margin-bottom:10px;" data-i18n="config_memory.extraction_llm_hint">
+          Global für alle User ohne eigenen Extraktions-LLM.
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label data-i18n="config_memory.extraction_llm">Extraktions-LLM</label>
+            <select id="mem-extraction-llm"><!-- JS --></select>
+          </div>
+          <div class="form-group">
+            <label data-i18n="config_memory.extraction_llm_fallback">Fallback Extraktions-LLM</label>
+            <select id="mem-extraction-llm-fallback"><!-- JS --></select>
+          </div>
+        </div>
+
+        <!-- Kontext-Anreicherung -->
+        <div class="form-row" style="margin-top:12px;">
+          <div class="form-group" style="flex:1;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="checkbox" id="mem-context-enrichment">
+              <span data-i18n="config_memory.context_enrichment">Kontext-Anreicherung</span>
+            </label>
+            <p class="hint" data-i18n="config_memory.context_enrichment_hint">
+              Löst Pronomen und Bezüge vor der Extraktion auf (extra LLM-Call pro Nachricht).
+              Empfohlen nur bei leistungsfähigen Modellen (z.B. MiniMax, Claude Haiku).
+              Bei kleinen Modellen kann dies zu fehlerhaften Extraktionen führen.
+            </p>
+          </div>
+        </div>
+
+        <!-- Kontext-Fenster für Extraktion -->
+        <div class="form-row" style="margin-top:12px;">
+          <div class="form-group">
+            <label data-i18n="config_memory.context_before">Kontext davor</label>
+            <input type="number" id="mem-context-before" min="0" max="20" value="3">
+          </div>
+          <div class="form-group">
+            <label data-i18n="config_memory.context_after">Kontext danach</label>
+            <input type="number" id="mem-context-after" min="0" max="20" value="2">
+          </div>
+        </div>
+        <p class="hint" data-i18n="config_memory.context_window_hint">
+          Anzahl Nachrichten vor und nach der aktuellen Nachricht, die bei der Extraktion mitgegeben werden.
+          Mehr Kontext hilft bei Korrekturen und Bezügen, kostet aber mehr Tokens.
+        </p>
+      </div>
+    </div>
+
+    <!-- Embedding-Modell -->
+    <div class="config-section">
+      <div class="config-section-header" data-i18n="config_memory.embedding_title">Embedding-Modell</div>
+      <div class="config-section-body">
+        <div class="form-row">
+          <div class="form-group" style="flex:1;">
+            <label data-i18n="config_memory.embedding_provider">Embedding-Provider</label>
+            <select id="embed-provider" onchange="_updateEmbedLocalUI()"><!-- JS --></select>
+          </div>
+          <div class="form-group" style="flex:0 0 auto;align-self:flex-end;">
+            <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="testEmbedding()" data-i18n="config_memory.embedding_test">Test</button>
+          </div>
+        </div>
+        <div id="embed-local-hint" style="display:none;margin-top:8px;padding:8px 12px;border-radius:6px;background:rgba(100,200,100,.08);border:1px solid rgba(100,200,100,.2);font-size:12px;color:var(--muted);"
+          data-i18n="config_memory.embed_local_hint">Kein externer Service nötig. Modell wird beim ersten Start heruntergeladen.</div>
+        <div class="form-group" style="margin-top:8px;">
+          <select id="embed-local-model-select" style="display:none;margin-top:4px;" onchange="selectLocalEmbedModel(this)">
+          </select>
+        </div>
+        <div class="form-group" style="margin-top:8px;">
+          <label data-i18n="config_memory.embedding_model">Modell</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="text" id="embed-model" value="" style="flex:1;"
+              oninput="updateEmbedDims()" placeholder="z.B. bge-m3, text-embedding-3-small">
+            <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;flex-shrink:0;"
+              onclick="fetchEmbeddingModels()" data-i18n="config_memory.embedding_fetch_models">Modelle laden</button>
+            <span id="embed-model-status" style="font-size:11px;color:var(--muted);white-space:nowrap;"></span>
+          </div>
+          <select id="embed-model-select" style="display:none;margin-top:6px;" onchange="selectEmbedModel(this)">
+          </select>
+        </div>
+        <div class="form-row" style="margin-top:8px;">
+          <div class="form-group">
+            <label data-i18n="config_memory.embedding_dims">Dimensions</label>
+            <input type="number" id="embed-dims" value="1024" readonly style="opacity:0.7;cursor:default;width:100px;">
+          </div>
+          <div class="form-group">
+            <label data-i18n="config_memory.embedding_fallback_provider">Fallback Embedding-Provider</label>
+            <select id="embed-fallback-provider"><!-- JS --></select>
+          </div>
+        </div>
+        <div id="embed-test-result" style="display:none;margin-top:8px;padding:8px 12px;border-radius:6px;font-size:12px;"></div>
+        <p class="form-warning" data-i18n="config_memory.embedding_warning">
+          Beim Wechsel des Embedding-Modells muessen alle Qdrant-Collections neu aufgebaut werden
+          (andere Dimensionen sind nicht kompatibel).
+        </p>
+      </div>
+    </div>
+
+    <!-- Dream Process -->
+    <div class="config-section" id="dream-section">
+      <div class="config-section-header" data-i18n="config_memory.dream_title">Traumprozess</div>
+      <div class="config-section-body">
+
+        <!-- Toggle + Uhrzeit + LLM -->
+        <div class="form-row" style="align-items:flex-end;flex-wrap:wrap;gap:14px;">
+          <div class="form-group" style="flex:0 0 auto;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="checkbox" id="dream-enabled">
+              <span data-i18n="config_memory.dream_enabled">Aktiviert</span>
+            </label>
+          </div>
+          <div class="form-group" style="flex:0 0 140px;">
+            <label data-i18n="config_memory.dream_schedule">Uhrzeit</label>
+            <input type="time" id="dream-schedule" value="02:00">
+          </div>
+          <div class="form-group" style="flex:1;min-width:180px;">
+            <label data-i18n="config_memory.dream_llm">LLM für Konsolidierung</label>
+            <select id="dream-llm"><!-- JS --></select>
+            <span style="font-size:11px;color:var(--muted);" data-i18n="config_memory.dream_llm_default">(wie Memory Extraction)</span>
+          </div>
+        </div>
+
+        <!-- Status + Aktionen -->
+        <div style="display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="runDreamNow()" id="dream-run-btn" data-i18n="config_memory.dream_run_now">Jetzt träumen</button>
+          <button class="btn btn-secondary" onclick="openDreamDiary()" id="dream-diary-btn" data-i18n="config_memory.dream_diary">Tagebuch</button>
+          <span id="dream-status-text" style="font-size:12px;color:var(--muted);"></span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Memory/Dream Save Bar -->
+    <div class="cfg-section-save-bar">
+      <button class="btn btn-primary" id="save-btn-memory" onclick="saveSectionMemory()">
+        <span data-i18n="config.section_save">Speichern</span>
+      </button>
+      <button class="btn btn-secondary" onclick="resetSectionMemory()">
+        <span data-i18n="config.section_reset">&#8635; Zurücksetzen</span>
+      </button>
+      <span id="save-status-memory" class="cfg-section-save-status"></span>
+    </div>
+
+    <!-- Memory Rebuild -->
+    <div class="config-section" id="rebuild-section">
+      <div class="config-section-header" data-i18n="config_memory.rebuild_title">Memory Rebuild aus Konversations-Logs</div>
+      <div class="config-section-body">
+        <p class="form-hint" style="margin-bottom:14px;">
+          Baut Qdrant komplett neu auf – nützlich nach Datenverlust oder Embedding-Modell-Wechsel.
+          Konversations-Logs sind die Source of Truth.<br>
+          <strong class="form-warning" style="margin-top:4px;display:inline-block;">Kann je nach Anzahl der Konversationen und LLM-Geschwindigkeit Minuten bis Stunden dauern.</strong>
+        </p>
+
+        <div class="section-header" style="margin-bottom:8px;">
+          <span class="section-label">Instanzen</span>
+          <div class="form-inline">
+            <button class="btn btn-sm btn-secondary" onclick="rebuildSelectEmpty()">Alle leeren wählen</button>
+            <button class="btn btn-sm btn-secondary" onclick="rebuildSelectAll()">Alle wählen</button>
+            <button class="btn btn-sm btn-secondary" onclick="rebuildSelectNone()">Keine</button>
+            <button class="btn btn-sm btn-secondary" onclick="loadMemoryStats()">↺ Aktualisieren</button>
+          </div>
+        </div>
+        <div id="rebuild-instance-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
+          <span class="form-hint">Wird geladen…</span>
+        </div>
+
+        <!-- Rebuild-Optionen -->
+        <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:14px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="rebuild-skip-trivial" checked>
+            <span data-i18n="config_memory.rebuild_skip_trivial">Triviale Einträge überspringen</span>
+          </label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label for="rebuild-delay" data-i18n="config_memory.rebuild_delay">Verzögerung</label>
+            <input type="number" id="rebuild-delay" value="0" min="0" max="5000" step="100"
+                   style="width:80px;" placeholder="ms">
+            <span class="form-hint" data-i18n="config_memory.rebuild_delay_hint">ms</span>
+          </div>
+        </div>
+        <div id="rebuild-scan-info" style="display:none;margin-bottom:14px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;" class="form-hint"></div>
+        <div id="rebuild-resume-info" style="display:none;margin-bottom:14px;padding:8px 12px;background:var(--yellow-bg, rgba(255,193,7,0.1));border:1px solid var(--yellow, #ffc107);border-radius:6px;"></div>
+
+        <div class="form-inline">
+          <button class="btn btn-primary" id="rebuild-btn" onclick="startRebuild()">Rebuild starten</button>
+          <button class="btn btn-danger" id="rebuild-cancel-btn" style="display:none;" onclick="cancelRebuild()" data-i18n="config_memory.rebuild_cancel_pause">Abbrechen / Pausieren</button>
+          <span id="rebuild-overall-status" class="form-hint"></span>
+        </div>
+
+        <div id="rebuild-progress-wrap" class="progress-wrap" style="display:none;">
+          <div class="progress-label">
+            <span id="rebuild-progress-label">0 / 0 Einträge</span>
+            <span id="rebuild-eta"></span>
+          </div>
+          <div class="progress-bar-outer">
+            <div id="rebuild-bar" class="progress-bar-inner"></div>
+          </div>
+          <div id="rebuild-status-text" class="progress-status"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Sub-Tab: Home Assistant ── -->
+  <div id="cfgpanel-ha" class="cfg-tab-panel" style="display:none;">
+
+    <div class="config-section">
+      <div class="config-section-header" data-i18n="config_services.ha_title">Home Assistant</div>
+      <div class="config-section-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Home Assistant URL</label>
+            <input type="url" id="svc-ha-url" placeholder="http://homeassistant.local:8123">
+          </div>
+          <div class="form-group">
+            <label>HA Long-Lived Token</label>
+            <input type="password" id="svc-ha-token" placeholder="••••••••">
+          </div>
+        </div>
+        <div class="form-inline" style="margin-top:4px;">
+          <button class="btn btn-sm btn-secondary" onclick="testHaConnection()">Verbindung testen</button>
+          <span id="test-ha-result" class="form-hint"></span>
+        </div>
+
+        <!-- MCP Server -->
+        <div class="mcp-subsection">
+          <div class="mcp-header">
+            <span class="label" data-i18n="config_services.mcp_title">MCP Server</span>
+            <label class="checkbox-label">
+              <input type="checkbox" id="svc-mcp-enabled" onchange="toggleMcpSection(this.checked)">
+              <span data-i18n="config_services.mcp_enabled">aktiviert</span>
+            </label>
+            <div class="mcp-links">
+              <a href="https://www.home-assistant.io/integrations/mcp_server/" target="_blank" data-i18n="config_services.mcp_docs">HA MCP Docs</a>
+              <a href="https://github.com/homeassistant-ai/ha-mcp" target="_blank">ha-mcp GitHub</a>
+            </div>
+          </div>
+          <div id="mcp-section" style="display:none;">
+            <div class="form-row">
+              <div class="form-group">
+                <label data-i18n="config_services.mcp_type">Typ</label>
+                <select id="svc-mcp-type" onchange="updateMcpTypeHints()">
+                  <option value="extended" data-i18n="config_services.mcp_type_extended">Erweitert / ha-mcp (89 Tools, Add-on nötig)</option>
+                  <option value="builtin" data-i18n="config_services.mcp_type_builtin">Integriert (HA 2025.1+, 6 Basis-Tools)</option>
+                </select>
+              </div>
+            </div>
+            <p id="mcp-info-builtin" class="form-hint" style="margin-bottom:10px; display:none;" data-i18n="config_services.mcp_info_builtin">
+              Integrierter MCP-Server ab HA 2025.1. In HA unter Einstellungen → Integrationen → Model Context Protocol Server aktivieren.
+            </p>
+            <p id="mcp-info-extended" class="form-hint" style="margin-bottom:10px;" data-i18n="config_services.mcp_info_extended">
+              ha-mcp Add-on bietet 89 Tools: Entity-Steuerung, Automationen, Dashboards, Kalender, Todo-Listen, HACS, History, Backups und mehr.
+            </p>
+            <div class="form-row">
+              <div class="form-group">
+                <label data-i18n="config_services.mcp_url">MCP Server URL</label>
+                <div class="form-inline">
+                  <input type="url" id="svc-mcp-url" style="flex:1;"
+                    oninput="document.getElementById('svc-mcp-url-hint').style.display='none'">
+                  <button id="mcp-auto-btn" class="btn btn-sm btn-secondary" onclick="autoFillMcpUrl()" style="display:none;" data-i18n="config_services.mcp_auto">Auto</button>
+                </div>
+                <span id="svc-mcp-url-hint" class="form-hint"></span>
+              </div>
+              <div class="form-group">
+                <label data-i18n="config_services.mcp_token">Auth-Token</label>
+                <input type="password" id="svc-mcp-token" placeholder="">
+                <span class="form-hint" data-i18n="config_services.mcp_empty_hint">leer = HA-Token verwenden</span>
+              </div>
+            </div>
+            <div class="form-inline" style="margin-top:4px;">
+              <button class="btn btn-sm btn-secondary" onclick="testMcpConnection()" data-i18n="config_services.mcp_test">MCP testen</button>
+              <span id="test-mcp-result" class="form-hint"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STT / TTS -->
+    <div class="config-section">
+      <div class="config-section-header" data-i18n="config_services.stt_tts_title">Sprache (STT / TTS)</div>
+      <div class="config-section-body">
+        <p class="form-hint" style="margin-bottom:14px;">
+          Speech-to-Text und Text-to-Speech über Home Assistant. Entities werden automatisch aus HA geladen.
+        </p>
+
+        <!-- Pipeline Picker -->
+        <div style="margin-bottom:18px;">
+          <label data-i18n="config_services.pipeline">Sprachassistent</label>
+          <div class="pipeline-picker-row">
+            <select id="svc-pipeline-select">
+              <option value="" data-i18n="config_services.pipeline_select">Bitte wählen...</option>
+            </select>
+            <button class="btn btn-sm btn-secondary" onclick="loadHaPipelines()" data-i18n="config_services.pipeline_load">Laden</button>
+            <button class="btn btn-sm btn-primary" onclick="applyPipeline()" data-i18n="config_services.pipeline_apply">Übernehmen</button>
+            <span id="pipeline-load-status" class="form-hint"></span>
+          </div>
+          <div id="pipeline-details" class="pipeline-details" style="display:none;"></div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border);margin-bottom:14px;">
+
+        <div class="form-inline" style="margin-bottom:14px;">
+          <button class="btn btn-sm btn-secondary" onclick="loadSttTtsEntities()">Entities laden</button>
+          <span id="stt-tts-load-status" class="form-hint"></span>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>STT Entity <span class="hint">(Spracherkennung)</span></label>
+            <select id="svc-stt-entity">
+              <option value="">– nicht konfiguriert –</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>TTS Entity <span class="hint">(Sprachausgabe)</span></label>
+            <select id="svc-tts-entity">
+              <option value="">– nicht konfiguriert –</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Sprache</label>
+            <select id="svc-stt-language">
+              <option value="de-DE">Deutsch (de-DE)</option>
+              <option value="en-US">English (en-US)</option>
+              <option value="en-GB">English UK (en-GB)</option>
+              <option value="fr-FR">Français (fr-FR)</option>
+              <option value="es-ES">Español (es-ES)</option>
+              <option value="it-IT">Italiano (it-IT)</option>
+              <option value="nl-NL">Nederlands (nl-NL)</option>
+              <option value="pl-PL">Polski (pl-PL)</option>
+              <option value="pt-BR">Português (pt-BR)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>TTS Stimme <span class="hint">(optional)</span></label>
+            <input type="text" id="svc-tts-voice" placeholder="z.B. DeAmala, DeKatja, DeConrad">
+            <span class="form-hint">
+              Nabu Casa Stimmen findest du in der HA App unter Einstellungen → Sprachassistenten → TTS.
+              Leer = Standardstimme.
+            </span>
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <label class="checkbox-label">
+            <input type="checkbox" id="svc-tts-also-text">
+            Antwort zusätzlich als Text senden (neben der Sprachnachricht)
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auto-Backup -->
+    <div class="config-section">
+      <div class="config-section-header" data-i18n="config_services.auto_backup_title">Auto-Backup</div>
+      <div class="config-section-body">
+        <label class="checkbox-label">
+          <input type="checkbox" id="svc-ha-auto-backup">
+          <span data-i18n="config_services.auto_backup_label">Automatisches HA-Backup vor Agent-Änderungen</span>
+        </label>
+        <p class="form-hint" data-i18n="config_services.auto_backup_desc">
+          Erstellt ein Home Assistant Backup bevor der Agent Automationen, Scripts
+          oder andere HA-Konfigurationen ändert.
+        </p>
+      </div>
+    </div>
+
+    <!-- Geplante Dienste -->
+    <div class="config-section muted">
+      <div class="config-section-header">Geplante Integrationen</div>
+      <div class="config-section-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="planned-card">
+          <div class="planned-card-title">HA Subscriptions · Phase 4+</div>
+          <div class="planned-card-desc">Echtzeit-Subscriptions auf HA-Ereignisse (Türklingel, Bewegungsmelder, …). Der Agent wird proaktiv benachrichtigt.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cfg-section-save-bar">
+      <button class="btn btn-primary" id="save-btn-ha" onclick="saveSectionHa()">
+        <span data-i18n="config.section_save">Speichern</span>
+      </button>
+      <button class="btn btn-secondary" onclick="resetSectionHa()">
+        <span data-i18n="config.section_reset">&#8635; Zurücksetzen</span>
+      </button>
+      <span id="save-status-ha" class="cfg-section-save-status"></span>
+    </div>
+
+  </div>
+
+  <!-- ── Sub-Tab: WhatsApp ── -->
+  <div id="cfgpanel-whatsapp" class="cfg-tab-panel" style="display:none;">
+
+    <div class="config-section">
+      <div class="config-section-header" data-i18n="config_services.wa_title">WhatsApp Bridge</div>
+      <div class="config-section-body">
+
+        <!-- Verbindungsstatus -->
+        <div id="wa-connection" class="wa-connection">
+          <div class="wa-status-row">
+            <div class="wa-status-indicator">
+              <span id="wa-status-dot" class="wa-status-dot"></span>
+              <strong id="wa-status-text">Status wird geladen...</strong>
+            </div>
+            <div class="form-inline">
+              <button class="btn btn-sm btn-secondary" onclick="refreshWaStatus()">Aktualisieren</button>
+              <button class="btn btn-sm btn-secondary" id="wa-logout-btn" style="display:none;" onclick="waLogout()">Trennen</button>
+            </div>
+          </div>
+          <div id="wa-account-info" class="wa-account-info" style="display:none;">
+            Verbunden als: <span id="wa-account-name"></span> (<span id="wa-account-jid"></span>)
+          </div>
+          <div id="wa-qr-container" class="wa-qr-container" style="display:none;">
+            <p class="form-hint" style="margin-bottom:8px;">QR-Code mit WhatsApp scannen (Verknüpfte Geräte → Gerät hinzufügen):</p>
+            <img id="wa-qr-img" alt="QR-Code">
+            <p class="form-hint" style="margin-top:6px;">Code wird automatisch aktualisiert...</p>
+          </div>
+          <div id="wa-offline-info" class="form-hint" style="display:none;">
+            Bridge-Container nicht erreichbar. Starte mit: <code class="tag">docker compose --profile agents up -d</code>
+          </div>
+        </div>
+
+        <!-- Modus-Konfiguration -->
+        <p class="form-hint" style="margin-bottom:14px;">
+          Globaler Modus für die WhatsApp-Bridge. Pro User wird nur die Rufnummer hinterlegt (Routing eingehender Nachrichten).
+        </p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Modus</label>
+            <select id="svc-wa-mode" onchange="document.getElementById('svc-wa-prefix-group').style.display=this.value==='self'?'':'none'">
+              <option value="separate">Separate Nummer (eigene SIM für HAANA)</option>
+              <option value="self">An mich selbst schreiben (eigene Nummer, Prefix nötig)</option>
+            </select>
+          </div>
+          <div class="form-group" id="svc-wa-prefix-group">
+            <label>Selbst-Prefix <span class="hint">(nur bei Modus "Selbst")</span></label>
+            <input type="text" id="svc-wa-prefix" placeholder="!h " value="!h ">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cfg-section-save-bar">
+      <button class="btn btn-primary" id="save-btn-whatsapp" onclick="saveSectionWhatsapp()">
+        <span data-i18n="config.section_save">Speichern</span>
+      </button>
+      <button class="btn btn-secondary" onclick="resetSectionWhatsapp()">
+        <span data-i18n="config.section_reset">&#8635; Zurücksetzen</span>
+      </button>
+      <span id="save-status-whatsapp" class="cfg-section-save-status"></span>
+    </div>
+
+  </div>
+
+  <!-- ── Sub-Tab: Infra ── -->
+  <div id="cfgpanel-infra" class="cfg-tab-panel" style="display:none;">
+
+    <div class="config-section">
+      <div class="config-section-header" data-i18n="config_services.infra_title">Infrastruktur</div>
+      <div class="config-section-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Qdrant URL</label>
+            <div class="form-inline">
+              <input type="url" id="svc-qdrant-url" placeholder="http://qdrant:6333" style="flex:1;">
+              <button class="btn btn-sm btn-secondary"
+                onclick="testSvcConn('qdrant', document.getElementById('svc-qdrant-url').value, 'test-qdrant')">Test</button>
+            </div>
+            <span id="test-qdrant" class="form-hint"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Geplante Infra-Features -->
+    <div class="config-section muted">
+      <div class="config-section-header">Geplante Features</div>
+      <div class="config-section-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="planned-card">
+          <div class="planned-card-title">Backup · Phase 2+</div>
+          <div class="planned-card-desc">Automatisches Backup der Qdrant-Collections auf TrueNAS (SMB).</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cfg-section-save-bar">
+      <button class="btn btn-primary" id="save-btn-infra" onclick="saveSectionInfra()">
+        <span data-i18n="config.section_save">Speichern</span>
+      </button>
+      <button class="btn btn-secondary" onclick="resetSectionInfra()">
+        <span data-i18n="config.section_reset">&#8635; Zurücksetzen</span>
+      </button>
+      <span id="save-status-infra" class="cfg-section-save-status"></span>
+    </div>
+
+  </div>
+
+  <!-- ── Sub-Tab: Logs ── -->
+  <div id="cfgpanel-logs" class="cfg-tab-panel" style="display:none;">
+
+    <!-- Log-Retention -->
+    <div class="config-section">
+      <div class="config-section-header" data-i18n="config_logs.retention_title">Log-Retention</div>
+      <div class="config-section-body">
+        <p class="form-hint" style="margin-bottom:14px;">
+          Konversations-Logs werden <strong class="status-ok">niemals gelöscht</strong> (Source of Truth für Memory-Rebuild).
+          Operative Logs (LLM-Calls, Tools, Memory) werden nach konfigurierbaren Tagen bereinigt.
+        </p>
+        <div class="form-row three">
+          <div class="form-group">
+            <label>LLM-Calls (Tage)</label>
+            <input type="number" id="ret-llm-calls" min="1" max="365" value="30">
+          </div>
+          <div class="form-group">
+            <label>Tool-Calls (Tage)</label>
+            <input type="number" id="ret-tool-calls" min="1" max="365" value="30">
+          </div>
+          <div class="form-group">
+            <label>Memory-Ops (Tage)</label>
+            <input type="number" id="ret-memory-ops" min="1" max="365" value="30">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Geplante Log-Features -->
+    <div class="config-section muted">
+      <div class="config-section-header">Geplante Log-Features</div>
+      <div class="config-section-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="planned-card">
+          <div class="planned-card-title">Anonymisierer · Phase 2+</div>
+          <div class="planned-card-desc">Entfernt personenbezogene Daten aus Logs bevor sie gespeichert werden.</div>
+        </div>
+        <div class="planned-card">
+          <div class="planned-card-title">Traumprozess · Phase 3+</div>
+          <div class="planned-card-desc">Nächtliche Konsolidierung: Konversationen werden zu dauerhaften Erinnerungen verdichtet und verknüpft.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cfg-section-save-bar">
+      <button class="btn btn-primary" id="save-btn-retention" onclick="saveSectionRetention()">
+        <span data-i18n="config.section_save">Speichern</span>
+      </button>
+      <button class="btn btn-secondary" onclick="resetSectionRetention()">
+        <span data-i18n="config.section_reset">&#8635; Zurücksetzen</span>
+      </button>
+      <span id="save-status-retention" class="cfg-section-save-status"></span>
+    </div>
+
+  </div>
+
+  <!-- ══ GIT REPOSITORY ══ -->
+  <div class="cfg-section" id="git-section" style="padding:var(--sp-4);border-top:1px solid var(--border);margin-top:var(--sp-2);">
+    <div style="margin-bottom:var(--sp-3);">
+      <h3 style="margin:0 0 var(--sp-2) 0;font-size:14px;font-weight:600;" data-i18n="git.section_title">Git Repository</h3>
+    </div>
+
+    <!-- Status-Zeile -->
+    <div id="git-status-bar" style="display:flex;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-3);flex-wrap:wrap;">
+      <span id="git-branch-badge" style="font-family:monospace;font-size:13px;background:var(--bg);padding:2px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);">–</span>
+      <span id="git-sync-info" style="font-size:12px;color:var(--muted);"></span>
+      <button class="btn btn-secondary btn-sm" onclick="gitShowLog()" data-i18n="git.log_btn">Verlauf</button>
+      <button class="btn btn-secondary btn-sm" onclick="gitToggleConnect()" data-i18n="git.connect_btn">Verbinden</button>
+      <button class="btn btn-primary btn-sm" onclick="gitPull()" data-i18n="git.pull_btn">↓ Pull</button>
+      <button class="btn btn-secondary btn-sm" onclick="gitPush()" data-i18n="git.push_btn">↑ Push</button>
+    </div>
+
+    <!-- Connect-Formular (initial versteckt) -->
+    <div id="git-connect-form" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:var(--sp-4);margin-bottom:var(--sp-3);">
+      <div class="form-group">
+        <label data-i18n="git.url_label">Repository-URL</label>
+        <input type="url" id="git-url-input" placeholder="https://github.com/user/repo.git" style="width:100%;">
+      </div>
+      <div class="form-group" style="margin-top:var(--sp-3);">
+        <label data-i18n="git.token_label">Access Token</label>
+        <input type="password" id="git-token-input" placeholder="ghp_..." style="width:100%;">
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-top:var(--sp-3);" onclick="gitConnect()" data-i18n="git.save_btn">Speichern &amp; Verbinden</button>
+    </div>
+
+    <!-- Output -->
+    <pre id="git-output" style="display:none;background:#1e1e1e;color:#d4d4d4;padding:var(--sp-3);border-radius:var(--radius-sm);font-size:12px;max-height:200px;overflow-y:auto;white-space:pre-wrap;"></pre>
+  </div>
+
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ USERS -->
+<div id="panel-users" class="panel">
+
+  <div class="users-header">
+    <h2>User-Verwaltung</h2>
+    <button class="btn" onclick="showNewUserCard()">+ Neuer User</button>
+  </div>
+
+  <!-- Neuer-User-Karte (einblendbar oben) -->
+  <div id="new-user-card" style="display:none;margin-bottom:16px;">
+    <div class="config-section">
+      <div class="config-section-header">Neuer User</div>
+      <div class="config-section-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>ID <span class="hint">(einmalig, nur a-z 0-9 -)</span></label>
+            <input type="text" id="nuf-id" placeholder="z.B. anna" pattern="[a-z0-9-]+" maxlength="30">
+          </div>
+          <div class="form-group">
+            <label>Anzeigename</label>
+            <input type="text" id="nuf-display-name" placeholder="z.B. Anna">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Rolle</label>
+            <select id="nuf-role">
+              <option value="user">User (eingeschränkt)</option>
+              <option value="admin">Admin (voller Zugriff)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>CLAUDE.md Template</label>
+            <select id="nuf-template">
+              <option value="user">User (Standard)</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label data-i18n="users.language">Antwortsprache</label>
+            <select id="nuf-language">
+              <option value="de">Deutsch</option>
+              <option value="en">English</option>
+              <option value="tr">Türkçe</option>
+              <option value="fr">Français</option>
+              <option value="es">Español</option>
+              <option value="it">Italiano</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-inline" style="margin-top:4px;">
+          <button class="btn" onclick="submitNewUser()">User anlegen</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('new-user-card').style.display='none'">Abbrechen</button>
+          <span id="nuf-status" class="form-hint"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- User-Liste (expandierbare Karten) -->
+  <div id="user-list" class="user-list">
+    <div class="empty-state"><div class="icon">...</div><div data-i18n="users.loading">Wird geladen...</div></div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ STATUS -->
+<div id="panel-status" class="panel">
+  <div class="status-grid" id="status-grid">
+    <div class="status-card">
+      <div class="empty-state"><div class="icon">...</div><div data-i18n="status.loading">Status wird geladen...</div></div>
+    </div>
+  </div>
+  <div style="margin-top:16px;">
+    <button class="btn btn-secondary" onclick="loadStatus()">↺ Aktualisieren</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ TERMINAL (Claude Code) -->
+<div id="panel-terminal" class="panel">
+  <div class="terminal-toolbar">
+    <label data-i18n="terminal.provider_label">Claude Code Provider</label>
+    <select id="term-provider-select"></select>
+    <button id="term-conn-btn" class="btn btn-primary btn-sm" onclick="termConnect()"
+            data-i18n="terminal.connect_btn">Verbinden</button>
+    <div class="terminal-status-dot disconnected" id="term-status-dot"></div>
+    <span id="term-status-text" style="font-size:12px;color:var(--muted);"></span>
+    <button class="btn btn-secondary btn-sm" onclick="termToggleFullscreen()"
+            style="margin-left:auto;" data-i18n="terminal.fullscreen">&#x26F6; Vollbild</button>
+  </div>
+  <div class="terminal-wrap">
+    <div id="terminal-xterm"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Log-Editor Modal -->
+<div id="log-editor-modal" class="modal-overlay">
+  <div class="modal-dialog wide">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="log-editor-title">Log Editor</div>
+        <div class="log-editor-warning">Nach dem Bearbeiten Memory-Rebuild empfohlen</div>
+      </div>
+      <button class="btn btn-sm btn-secondary" onclick="closeLogEditor()">✕ Schließen</button>
+    </div>
+    <div class="log-editor-hint">
+      Jede Zeile ist ein JSON-Objekt (eine Konversation). Zeilen entfernen oder bearbeiten, dann Speichern.
+      <span id="log-editor-info" style="margin-left:12px;color:var(--text);"></span>
+    </div>
+    <textarea id="log-editor-area" class="log-editor-area" spellcheck="false"></textarea>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveLogEditor()">Speichern</button>
+      <button class="btn btn-secondary" onclick="closeLogEditor()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Jinja2 Template-Variablen als globale JS-Variablen -->
+<script>const INSTANCES = {{ instances | tojson }};</script>
+
+<!-- Basis-Bibliotheken -->
+<script src="/static/js/i18n.js?v=4"></script>
+<script src="/static/js/utils.js?v=3"></script>
+<script src="/static/js/modal.js?v=3"></script>
+
+<!-- App-Kern (globaler State, Tabs, Init) -->
+<script src="/static/js/app.js?v=12"></script>
+
+<!-- Setup Wizard -->
+<script src="/static/js/wizard.js?v=3"></script>
+
+<!-- Feature-Module -->
+<script src="/static/js/chat.js?v=5"></script>
+<script src="/static/js/config.js?v=7"></script>
+<script src="/static/js/users.js?v=6"></script>
+<script src="/static/js/status.js?v=3"></script>
+<script src="/static/js/logs.js?v=6"></script>
+<script src="/static/js/whatsapp.js?v=3"></script>
+<script src="/static/js/git.js?v=1"></script>
+<script src="/static/lib/xterm.min.js"></script>
+<script src="/static/lib/xterm-addon-fit.min.js"></script>
+<script src="/static/js/terminal.js?v=1"></script>
+</body>
+</html>
