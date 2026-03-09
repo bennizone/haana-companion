@@ -669,7 +669,16 @@
     "api_key_replace_placeholder": "Neuen Key eingeben (leer lassen = unverändert)",
     "close_btn": "Schließen",
     "provider_retest": "Verbindung testen",
-    "provider_retest_title": "Optional: Verbindung neu testen und Modelle nachladen"
+    "provider_retest_title": "Optional: Verbindung neu testen und Modelle nachladen",
+    "provider_auth_choose": "Wie möchtest du dich verbinden?",
+    "provider_auth_apikey": "API Key",
+    "provider_auth_apikey_desc": "Gib deinen Anthropic API Key ein",
+    "provider_auth_oauth": "OAuth (Claude.ai)",
+    "provider_auth_oauth_desc": "Kostenlos mit deinem Claude.ai Account verbinden",
+    "oauth_connecting": "Öffne Browser für Authentifizierung...",
+    "oauth_waiting": "Warte auf Bestätigung...",
+    "oauth_success": "Erfolgreich verbunden!",
+    "oauth_error": "Verbindung fehlgeschlagen. Versuche es erneut oder nutze API Key."
   },
   "terminal": {
     "tab": "Entwicklung",

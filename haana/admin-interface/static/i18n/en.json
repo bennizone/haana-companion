@@ -669,7 +669,16 @@
     "api_key_replace_placeholder": "Enter new key (leave empty = keep unchanged)",
     "close_btn": "Close",
     "provider_retest": "Test connection",
-    "provider_retest_title": "Optional: re-test connection and reload models"
+    "provider_retest_title": "Optional: re-test connection and reload models",
+    "provider_auth_choose": "How do you want to connect?",
+    "provider_auth_apikey": "API Key",
+    "provider_auth_apikey_desc": "Enter your Anthropic API key",
+    "provider_auth_oauth": "OAuth (Claude.ai)",
+    "provider_auth_oauth_desc": "Connect for free with your Claude.ai account",
+    "oauth_connecting": "Opening browser for authentication...",
+    "oauth_waiting": "Waiting for confirmation...",
+    "oauth_success": "Successfully connected!",
+    "oauth_error": "Connection failed. Try again or use API Key."
   },
   "terminal": {
     "tab": "Development",
