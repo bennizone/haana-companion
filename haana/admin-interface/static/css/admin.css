@@ -244,6 +244,11 @@ header h1 span { color: var(--accent2); }
   display: flex; align-items: center; gap: var(--sp-2);
   font-size: 12px; cursor: pointer;
 }
+input[type="checkbox"] {
+  width: 14px; height: 14px; min-width: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
 
 /* ── Conversation Cards ── */
 #conv-list { display: flex; flex-direction: column; gap: var(--sp-3); }

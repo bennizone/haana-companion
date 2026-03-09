@@ -8,7 +8,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     jq \
     bash \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
+
+# Claude CLI (fuer OAuth + Agent-SDK)
+RUN npm install -g @anthropic-ai/claude-code --yes \
+    && rm -rf /root/.npm /tmp/npm-*
 
 # Qdrant Binary (statisch gelinkt)
 ARG QDRANT_VERSION=1.13.6
