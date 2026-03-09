@@ -2,12 +2,13 @@ ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
 # System-Pakete
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
-    py3-pip \
+    python3-pip \
     curl \
     jq \
-    bash
+    bash \
+    && rm -rf /var/lib/apt/lists/*
 
 # Qdrant Binary (statisch gelinkt)
 ARG QDRANT_VERSION=1.13.6
@@ -15,7 +16,7 @@ ARG TARGETARCH
 RUN if [ "$TARGETARCH" = "amd64" ]; then ARCH="x86_64"; \
     elif [ "$TARGETARCH" = "arm64" ]; then ARCH="aarch64"; \
     else ARCH="x86_64"; fi && \
-    curl -fsSL "https://github.com/qdrant/qdrant/releases/download/v${QDRANT_VERSION}/qdrant-${ARCH}-unknown-linux-musl.tar.gz" \
+    curl -fsSL "https://github.com/qdrant/qdrant/releases/download/v${QDRANT_VERSION}/qdrant-${ARCH}-unknown-linux-gnu.tar.gz" \
     | tar -xz -C /usr/local/bin/ qdrant
 
 # Python-Abhaengigkeiten
