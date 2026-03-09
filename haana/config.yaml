@@ -23,8 +23,6 @@ ports_description:
   8080/tcp: "HAANA Admin Interface"
 options:
   anthropic_api_key: ""
-  ollama_url: ""
-  ha_mcp_url: ""
 schema:
   anthropic_api_key: "str?"
   ollama_url: "url?"
