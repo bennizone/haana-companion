@@ -731,9 +731,11 @@ async def auth_logout():
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
+    ingress_path = request.headers.get("X-Ingress-Path", "").rstrip("/")
     return templates.TemplateResponse("index.html", {
         "request": request,
         "instances": get_all_instances(),
+        "base_path": ingress_path + "/" if ingress_path else "/",
     })
 
 

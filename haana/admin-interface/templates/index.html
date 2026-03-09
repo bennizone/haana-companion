@@ -4,9 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HAANA Admin</title>
-<link rel="stylesheet" href="/static/css/admin.css?v=8">
-<link rel="stylesheet" href="/static/lib/xterm.css">
-<link rel="stylesheet" href="/static/css/terminal.css?v=1">
+<base href="{{ base_path }}">
+<link rel="stylesheet" href="static/css/admin.css?v=8">
+<link rel="stylesheet" href="static/lib/xterm.css">
+<link rel="stylesheet" href="static/css/terminal.css?v=1">
 </head>
 <body>
 
@@ -1072,29 +1073,59 @@
 </div>
 
 <!-- Jinja2 Template-Variablen als globale JS-Variablen -->
-<script>const INSTANCES = {{ instances | tojson }};</script>
+<script>
+const INSTANCES = {{ instances | tojson }};
+// Ingress-Prefix für HA Addon (leerer String = direkter Zugriff)
+window.HAANA_BASE = "{{ base_path }}";
+// fetch-Wrapper: absolute /api/ und /ws/ Pfade auf Ingress-Prefix umbiegen
+(function() {
+  const _base = window.HAANA_BASE.replace(/\/$/, '');
+  if (!_base) return;
+  const _origFetch = window.fetch.bind(window);
+  window.fetch = function(url, ...args) {
+    if (typeof url === 'string' && url.startsWith('/')) {
+      url = _base + url;
+    }
+    return _origFetch(url, ...args);
+  };
+  // WebSocket-Wrapper
+  const _origWS = window.WebSocket;
+  window.WebSocket = function(url, ...args) {
+    if (typeof url === 'string' && url.startsWith('/')) {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      url = proto + '//' + location.host + _base + url;
+    }
+    return new _origWS(url, ...args);
+  };
+  window.WebSocket.prototype = _origWS.prototype;
+  window.WebSocket.CONNECTING = _origWS.CONNECTING;
+  window.WebSocket.OPEN = _origWS.OPEN;
+  window.WebSocket.CLOSING = _origWS.CLOSING;
+  window.WebSocket.CLOSED = _origWS.CLOSED;
+})();
+</script>
 
 <!-- Basis-Bibliotheken -->
-<script src="/static/js/i18n.js?v=4"></script>
-<script src="/static/js/utils.js?v=3"></script>
-<script src="/static/js/modal.js?v=3"></script>
+<script src="static/js/i18n.js?v=4"></script>
+<script src="static/js/utils.js?v=3"></script>
+<script src="static/js/modal.js?v=3"></script>
 
 <!-- App-Kern (globaler State, Tabs, Init) -->
-<script src="/static/js/app.js?v=12"></script>
+<script src="static/js/app.js?v=12"></script>
 
 <!-- Setup Wizard -->
-<script src="/static/js/wizard.js?v=3"></script>
+<script src="static/js/wizard.js?v=3"></script>
 
 <!-- Feature-Module -->
-<script src="/static/js/chat.js?v=5"></script>
-<script src="/static/js/config.js?v=7"></script>
-<script src="/static/js/users.js?v=6"></script>
-<script src="/static/js/status.js?v=3"></script>
-<script src="/static/js/logs.js?v=6"></script>
-<script src="/static/js/whatsapp.js?v=3"></script>
-<script src="/static/js/git.js?v=1"></script>
-<script src="/static/lib/xterm.min.js"></script>
-<script src="/static/lib/xterm-addon-fit.min.js"></script>
-<script src="/static/js/terminal.js?v=1"></script>
+<script src="static/js/chat.js?v=5"></script>
+<script src="static/js/config.js?v=7"></script>
+<script src="static/js/users.js?v=6"></script>
+<script src="static/js/status.js?v=3"></script>
+<script src="static/js/logs.js?v=6"></script>
+<script src="static/js/whatsapp.js?v=3"></script>
+<script src="static/js/git.js?v=1"></script>
+<script src="static/lib/xterm.min.js"></script>
+<script src="static/lib/xterm-addon-fit.min.js"></script>
+<script src="static/js/terminal.js?v=1"></script>
 </body>
 </html>
