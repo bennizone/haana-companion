@@ -3101,7 +3101,11 @@ async def claude_auth_login_complete(request: Request):
     code = body.get("code", "").strip()
     if not code:
         return {"ok": False, "detail": "Authorization code missing"}
-    return await asyncio.to_thread(_complete_oauth_login_sync, code)
+    try:
+        return await asyncio.to_thread(_complete_oauth_login_sync, code)
+    except Exception as e:
+        logger.exception("OAuth complete error")
+        return {"ok": False, "detail": str(e)}
 
 
 # ── Provider-scoped OAuth Endpoints ──────────────────────────────────────────
@@ -3156,7 +3160,11 @@ async def claude_auth_login_complete_provider(provider_id: str, request: Request
     if not code:
         return {"ok": False, "detail": "Authorization code missing"}
 
-    result = await asyncio.to_thread(_complete_oauth_login_sync, code)
+    try:
+        result = await asyncio.to_thread(_complete_oauth_login_sync, code)
+    except Exception as e:
+        logger.exception("OAuth complete (provider) error")
+        return {"ok": False, "detail": str(e)}
 
     # Copy credentials to provider-specific directory (auch bei Fehler versuchen,
     # da der erste complete-Aufruf funktioniert haben könnte)
