@@ -2852,6 +2852,10 @@ def _cleanup_oauth_session():
 
 def _start_oauth_login_sync():
     """Blocking: spawn `claude setup-token`, extract OAuth URL."""
+    import shutil as _shutil
+    if not _shutil.which("claude"):
+        return {"ok": False, "detail": "Claude CLI nicht installiert. Bitte API Key verwenden oder 'npm install -g @anthropic-ai/claude-code' im Container ausführen."}
+
     global _oauth_login_session
 
     _cleanup_oauth_session()

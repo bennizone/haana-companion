@@ -51,6 +51,11 @@ function wizardInit() {
   _wizState.extractionLlm = '';
   _wizState.dreamEnabled = false;
   _wizState.selectedPipeline = '';
+  // Always reset HA state so Step 2 fetches fresh data on every wizard run
+  _wizState.haUsers = [];
+  _wizState.haReachable = false;
+  _wizState.pipelines = [];
+  _wizState.mcpAddonAvailable = false;
 
   const overlay = document.getElementById('wizard-overlay');
   if (!overlay) return;
@@ -83,6 +88,11 @@ async function wizardInitExtend() {
   _wizState.llms = [];
   _wizState.existingLlms = [];
   _wizState.users = [];
+  // Always reset HA state so Step 2 fetches fresh data on every wizard run
+  _wizState.haUsers = [];
+  _wizState.haReachable = false;
+  _wizState.pipelines = [];
+  _wizState.mcpAddonAvailable = false;
 
   if (currentCfg) {
     // Pre-fill existing LLMs first (must happen before _wizRebuildLlmList)
@@ -352,9 +362,14 @@ function _wizOAuthSectionHtml(p, i) {
 }
 
 function wizAddProvider() {
+  // Remove any existing picker first (prevent duplicates)
+  const existing = document.getElementById('wiz-type-picker');
+  if (existing) existing.remove();
+
   // Show a type picker inline
   const list = document.getElementById('wiz-providers-list');
   const picker = document.createElement('div');
+  picker.id = 'wiz-type-picker';
   picker.className = 'wizard-provider-card';
   picker.style.marginBottom = 'var(--sp-3)';
   picker.innerHTML = `
@@ -368,7 +383,7 @@ function wizAddProvider() {
         </div>`).join('')}
     </div>
     <div style="margin-top:var(--sp-3);text-align:right;">
-      <button class="btn btn-secondary btn-sm" onclick="this.closest('.wizard-provider-card').remove()">
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('wiz-type-picker').remove()">
         ${t('common.cancel')}
       </button>
     </div>`;
@@ -381,8 +396,7 @@ function wizSelectProviderType(type) {
 
   if (type === 'anthropic') {
     // Show auth method chooser in the picker area before adding to state
-    const pickers = document.querySelectorAll('.wizard-provider-card');
-    const picker = pickers[pickers.length - 1];
+    const picker = document.getElementById('wiz-type-picker');
     if (picker) {
       picker.innerHTML = `
         <p style="font-size:13px;font-weight:600;margin-bottom:var(--sp-3);">${t('wizard.provider_auth_choose')}</p>
@@ -399,7 +413,7 @@ function wizSelectProviderType(type) {
           </div>
         </div>
         <div style="margin-top:var(--sp-3);text-align:right;">
-          <button class="btn btn-secondary btn-sm" onclick="this.closest('.wizard-provider-card').remove()">
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('wiz-type-picker').remove()">
             ${t('common.cancel')}
           </button>
         </div>`;
@@ -973,30 +987,65 @@ function _wizStep3Html() {
 }
 
 async function _wizStep3Init() {
-  // MCP check
+  // MCP check: fetch addon list, detect MCP addon case-insensitively, show all addons for manual selection
+  let allAddons = [];
+  let addonModeAvailable = false;
   try {
     const r = await fetch('/api/supervisor/addons');
     if (r.ok) {
       const d = await r.json();
-      const addons = d.addons || d || [];
-      _wizState.mcpAddonAvailable = addons.some(a =>
-        (a.slug || a.name || '').toLowerCase().includes('mcp') ||
-        (a.slug || a.name || '').toLowerCase().includes('ha-mcp')
+      addonModeAvailable = d.addon_mode !== false;
+      allAddons = d.addons || [];
+      const mcpAddons = allAddons.filter(a =>
+        (a.slug || '').toLowerCase().includes('mcp') ||
+        (a.name || '').toLowerCase().includes('mcp')
       );
+      _wizState.mcpAddonAvailable = mcpAddons.length > 0;
     }
   } catch(_) {}
 
   const mcpEl = document.getElementById('wiz-mcp-status');
   if (mcpEl) {
     if (_wizState.mcpAddonAvailable) {
+      // Auto-detected MCP addon(s)
+      const mcpAddons = allAddons.filter(a =>
+        (a.slug || '').toLowerCase().includes('mcp') ||
+        (a.name || '').toLowerCase().includes('mcp')
+      );
+      const addonListHtml = mcpAddons.map(a =>
+        `<span class="tag" style="font-size:11px;margin-right:4px;">${escHtml(a.name || a.slug)}</span>`
+      ).join('');
       mcpEl.innerHTML = `<div class="wizard-info-card">
         <span style="color:var(--green);font-size:18px;">&#10003;</span>
         <div>
-          <strong>${t('wizard.mcp_detected')}</strong><br>
+          <strong>${t('wizard.mcp_detected')}</strong>
+          <div style="margin-top:4px;">${addonListHtml}</div>
           <span style="font-size:12px;color:var(--muted);">${t('wizard.mcp_detected_desc')}</span>
         </div>
       </div>`;
+    } else if (addonModeAvailable && allAddons.length > 0) {
+      // Supervisor reachable but no MCP addon found – show all addons for manual selection
+      const optionsHtml = allAddons.map(a =>
+        `<option value="${escAttr(a.slug)}">${escHtml(a.name || a.slug)} (${escHtml(a.slug)})</option>`
+      ).join('');
+      mcpEl.innerHTML = `<div class="wizard-info-card" style="flex-direction:column;align-items:flex-start;gap:var(--sp-2);">
+        <div style="display:flex;gap:var(--sp-2);align-items:center;">
+          <span style="font-size:18px;">&#8505;</span>
+          <span style="font-size:12px;color:var(--muted);">${t('wizard.mcp_not_detected')}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${t('wizard.mcp_select_hint')}</div>
+        <select id="wiz-mcp-addon-select" style="max-width:340px;font-size:12px;"
+          onchange="_wizOnMcpAddonSelect(this.value)">
+          <option value="">${t('wizard.mcp_select_none')}</option>
+          ${optionsHtml}
+        </select>
+        <div style="margin-top:4px;">
+          <a href="https://github.com/voithos/ha-mcp-bridge" target="_blank" rel="noopener"
+            style="font-size:12px;color:var(--accent2);">${t('wizard.mcp_install_link')}</a>
+        </div>
+      </div>`;
     } else {
+      // Not in addon mode or no addons at all
       mcpEl.innerHTML = `<div class="wizard-info-card">
         <span style="font-size:18px;">&#8505;</span>
         <div>
@@ -1030,6 +1079,28 @@ async function _wizStep3Init() {
       }
     }
   } catch(_) {}
+}
+
+// Called when user manually selects an MCP addon from the dropdown
+function _wizOnMcpAddonSelect(slug) {
+  _wizState.mcpAddonAvailable = !!slug;
+  // Update the card to show confirmation if a non-empty slug was selected
+  const sel = document.getElementById('wiz-mcp-addon-select');
+  const hint = sel && sel.closest('.wizard-info-card')
+    ? sel.closest('.wizard-info-card').querySelector('div[data-mcp-confirm]')
+    : null;
+  // Simple visual feedback: swap info icon for checkmark when a slug is chosen
+  const card = document.getElementById('wiz-mcp-addon-select')?.closest('.wizard-info-card');
+  if (card) {
+    const icon = card.querySelector('span[data-mcp-icon]') || card.querySelector('span:first-child');
+    if (icon && slug) {
+      icon.style.color = 'var(--green)';
+      icon.innerHTML = '&#10003;';
+    } else if (icon) {
+      icon.style.color = '';
+      icon.innerHTML = '&#8505;';
+    }
+  }
 }
 
 // ── Finish ─────────────────────────────────────────────────────────────────

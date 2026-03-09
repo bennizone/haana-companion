@@ -641,6 +641,8 @@
     "mcp_detected_desc": "Das ha-mcp Add-on ist installiert. HAANA kann erweiterte HA-Steuerung verwenden (89 Tools).",
     "mcp_not_detected": "ha-mcp Add-on nicht gefunden. Optional für erweiterte Home Assistant Steuerung.",
     "mcp_install_link": "ha-mcp Add-on auf GitHub →",
+    "mcp_select_hint": "Kein MCP-Add-on automatisch erkannt. Bitte manuell auswählen falls vorhanden:",
+    "mcp_select_none": "Kein MCP-Add-on",
     "pipeline_title": "Sprachassistent (Pipeline)",
     "pipeline_desc": "Wähle einen bestehenden HA-Sprachassistenten, dessen STT/TTS-Einstellungen HAANA übernehmen soll.",
     "pipeline_skip": "Überspringen",
