@@ -3024,13 +3024,24 @@ def _complete_oauth_login_sync(code: str):
             tmp_creds = p
             break
     else:
-        # List what files actually exist in tmp_home
+        # List what files actually exist in tmp_home and /root/.claude
         try:
             import subprocess as _sp2
             ls_result = _sp2.run(["find", tmp_home, "-type", "f"], capture_output=True, text=True, timeout=5)
-            logger.info(f"setup-token: Files in {tmp_home}: {ls_result.stdout.strip()}")
-        except Exception:
-            pass
+            logger.warning(f"setup-token: No credentials found in expected paths. Files in {tmp_home}: {repr(ls_result.stdout.strip())}")
+            # Also check if claude wrote to /root/.claude directly (ignoring HOME)
+            root_claude = Path("/root/.claude")
+            if root_claude.exists():
+                ls2 = _sp2.run(["find", str(root_claude), "-type", "f"], capture_output=True, text=True, timeout=5)
+                logger.warning(f"setup-token: Files in /root/.claude: {repr(ls2.stdout.strip())}")
+                # Try to use /root/.claude credentials as fallback
+                for fallback in [root_claude / ".credentials.json", root_claude / "credentials.json"]:
+                    if fallback.is_file():
+                        logger.info(f"setup-token: Using fallback credentials from {fallback}")
+                        tmp_creds = fallback
+                        break
+        except Exception as ex:
+            logger.warning(f"setup-token: find failed: {ex}")
 
     if tmp_creds.is_file():
         try:
@@ -3115,9 +3126,8 @@ async def claude_auth_status_provider(provider_id: str):
     """Prüft ob gültige Claude OAuth-Credentials für einen Provider vorliegen."""
     cfg = load_config()
     prov = next((p for p in cfg.get("providers", []) if p.get("id") == provider_id), None)
-    if not prov:
-        raise HTTPException(404, "Provider nicht gefunden")
-    oauth_dir = Path(prov.get("oauth_dir", f"/data/claude-auth/{provider_id}"))
+    # Auch ohne gespeicherten Provider den Default-Pfad prüfen (z.B. vor dem ersten Speichern)
+    oauth_dir = Path(prov.get("oauth_dir", f"/data/claude-auth/{provider_id}") if prov else f"/data/claude-auth/{provider_id}")
     creds_file = oauth_dir / ".credentials.json"
     if not creds_file.exists():
         return {"ok": False, "status": "no_credentials", "detail": "Keine Credentials gefunden"}
@@ -3166,32 +3176,33 @@ async def claude_auth_login_complete_provider(provider_id: str, request: Request
         logger.exception("OAuth complete (provider) error")
         return {"ok": False, "detail": str(e)}
 
-    # Copy credentials to provider-specific directory (auch bei Fehler versuchen,
-    # da der erste complete-Aufruf funktioniert haben könnte)
+    # Copy credentials to provider-specific directory (auch ohne gespeicherten Provider)
     cfg = load_config()
     prov = next((p for p in cfg.get("providers", []) if p.get("id") == provider_id), None)
-    if prov:
-        oauth_dir = Path(prov.get("oauth_dir", f"/data/claude-auth/{provider_id}"))
-        global_creds = CLAUDE_AUTH_DIR / ".credentials.json"
-        if global_creds.exists():
-            try:
-                import shutil
-                oauth_dir.mkdir(parents=True, exist_ok=True)
-                dest = oauth_dir / ".credentials.json"
-                shutil.copy2(str(global_creds), str(dest))
-                os.chmod(dest, 0o600)
-                import subprocess
-                subprocess.run(["chown", "1000:1000", str(dest)], check=False)
-                logger.info(f"OAuth credentials kopiert: {global_creds} → {dest}")
-                # Nur als Erfolg melden wenn die Credentials tatsächlich gültig sind
-                if not result.get("ok"):
-                    creds = json.loads(dest.read_text(encoding="utf-8"))
-                    oauth = creds.get("claudeAiOauth", {})
-                    expires_at = oauth.get("expiresAt", 0) / 1000
-                    if oauth.get("accessToken") and (expires_at == 0 or expires_at > time.time()):
-                        result = {"ok": True, "detail": "Login successful. Credentials saved."}
-            except Exception as e:
-                logger.error(f"OAuth credential copy failed: {e}")
+    oauth_dir = Path(prov.get("oauth_dir", f"/data/claude-auth/{provider_id}") if prov else f"/data/claude-auth/{provider_id}")
+    global_creds = CLAUDE_AUTH_DIR / ".credentials.json"
+    logger.info(f"OAuth complete: global_creds={global_creds} exists={global_creds.exists()}, oauth_dir={oauth_dir}, prov={'found' if prov else 'not in config'}")
+    if global_creds.exists():
+        try:
+            import shutil
+            oauth_dir.mkdir(parents=True, exist_ok=True)
+            dest = oauth_dir / ".credentials.json"
+            shutil.copy2(str(global_creds), str(dest))
+            os.chmod(dest, 0o600)
+            import subprocess
+            subprocess.run(["chown", "1000:1000", str(dest)], check=False)
+            logger.info(f"OAuth credentials kopiert: {global_creds} → {dest}")
+            # Nur als Erfolg melden wenn die Credentials tatsächlich gültig sind
+            if not result.get("ok"):
+                creds = json.loads(dest.read_text(encoding="utf-8"))
+                oauth = creds.get("claudeAiOauth", {})
+                expires_at = oauth.get("expiresAt", 0) / 1000
+                if oauth.get("accessToken") and (expires_at == 0 or expires_at > time.time()):
+                    result = {"ok": True, "detail": "Login successful. Credentials saved."}
+        except Exception as e:
+            logger.error(f"OAuth credential copy failed: {e}")
+    else:
+        logger.warning(f"OAuth complete: global_creds {global_creds} does not exist after complete!")
 
     return result
 
