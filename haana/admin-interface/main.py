@@ -3114,7 +3114,7 @@ async def claude_auth_login_complete(request: Request):
 async def claude_auth_status_provider(provider_id: str):
     """Prüft ob gültige Claude OAuth-Credentials für einen Provider vorliegen."""
     cfg = load_config()
-    prov = next((p for p in cfg.get("providers", []) if p["id"] == provider_id), None)
+    prov = next((p for p in cfg.get("providers", []) if p.get("id") == provider_id), None)
     if not prov:
         raise HTTPException(404, "Provider nicht gefunden")
     oauth_dir = Path(prov.get("oauth_dir", f"/data/claude-auth/{provider_id}"))
@@ -3169,7 +3169,7 @@ async def claude_auth_login_complete_provider(provider_id: str, request: Request
     # Copy credentials to provider-specific directory (auch bei Fehler versuchen,
     # da der erste complete-Aufruf funktioniert haben könnte)
     cfg = load_config()
-    prov = next((p for p in cfg.get("providers", []) if p["id"] == provider_id), None)
+    prov = next((p for p in cfg.get("providers", []) if p.get("id") == provider_id), None)
     if prov:
         oauth_dir = Path(prov.get("oauth_dir", f"/data/claude-auth/{provider_id}"))
         global_creds = CLAUDE_AUTH_DIR / ".credentials.json"
@@ -3213,7 +3213,7 @@ async def claude_auth_upload_provider(provider_id: str, request: Request):
         raise HTTPException(400, "Credentials müssen claudeAiOauth mit accessToken und refreshToken enthalten")
 
     cfg = load_config()
-    prov = next((p for p in cfg.get("providers", []) if p["id"] == provider_id), None)
+    prov = next((p for p in cfg.get("providers", []) if p.get("id") == provider_id), None)
     if not prov:
         raise HTTPException(404, "Provider nicht gefunden")
 
