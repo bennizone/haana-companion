@@ -973,6 +973,18 @@
       <div class="config-section-body">
         <div class="form-row">
           <div class="form-group">
+            <label>HA Person <span class="hint">(optional, befüllt ID und Name automatisch)</span></label>
+            <div style="display:flex;gap:6px;">
+              <select id="nuf-ha-user" style="flex:1;" onchange="onNewUserHaSelect()">
+                <option value="">-- HA Person auswählen --</option>
+              </select>
+              <button class="btn btn-secondary" style="font-size:11px;padding:4px 8px;flex-shrink:0;" onclick="loadHaUsersForNewUser()">↺</button>
+            </div>
+            <span id="nuf-ha-status" style="font-size:11px;color:var(--muted);"></span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
             <label>ID <span class="hint">(einmalig, nur a-z 0-9 -)</span></label>
             <input type="text" id="nuf-id" placeholder="z.B. anna" pattern="[a-z0-9-]+" maxlength="30">
           </div>
@@ -1124,7 +1136,7 @@ window.HAANA_BASE = "{{ base_path }}";
 <!-- Feature-Module -->
 <script src="static/js/chat.js?v=5"></script>
 <script src="static/js/config.js?v=11"></script>
-<script src="static/js/users.js?v=6"></script>
+<script src="static/js/users.js?v=7"></script>
 <script src="static/js/status.js?v=3"></script>
 <script src="static/js/logs.js?v=6"></script>
 <script src="static/js/whatsapp.js?v=3"></script>

@@ -335,7 +335,45 @@ async function saveUserClaudeMd(uid) {
 
 function showNewUserCard() {
   document.getElementById('new-user-card').style.display = '';
+  loadHaUsersForNewUser();
   document.getElementById('nuf-id').focus();
+}
+
+async function loadHaUsersForNewUser() {
+  const sel = document.getElementById('nuf-ha-user');
+  const status = document.getElementById('nuf-ha-status');
+  if (!sel) return;
+  try {
+    const r = await fetch('/api/ha-users');
+    const data = await r.json();
+    if (data.ok && data.users.length > 0) {
+      sel.innerHTML = '<option value="">-- HA Person auswählen --</option>' +
+        data.users.map(u =>
+          `<option value="${escAttr(u.id)}" data-name="${escAttr(u.display_name)}">${escHtml(u.display_name)} (${escHtml(u.id)})</option>`
+        ).join('');
+      if (status) { status.textContent = data.users.length + ' Personen gefunden'; status.style.color = 'var(--green)'; }
+    } else {
+      if (status) { status.textContent = data.error || 'HA nicht erreichbar'; status.style.color = 'var(--yellow)'; }
+    }
+  } catch(e) {
+    if (status) { status.textContent = 'Fehler: ' + e.message; status.style.color = 'var(--red)'; }
+  }
+}
+
+function onNewUserHaSelect() {
+  const sel = document.getElementById('nuf-ha-user');
+  const idEl = document.getElementById('nuf-id');
+  const nameEl = document.getElementById('nuf-display-name');
+  if (!sel || !sel.value) return;
+  // Extract name from data-name attribute
+  const opt = sel.options[sel.selectedIndex];
+  const haName = opt?.getAttribute('data-name') || '';
+  // Extract slug from entity ID: "person.benni" → "benni"
+  const haId = sel.value; // e.g. "person.benni"
+  const slug = haId.includes('.') ? haId.split('.').slice(1).join('.') : haId;
+  // Auto-fill ID and name if empty
+  if (idEl && !idEl.value) idEl.value = slug.replace(/[^a-z0-9-]/g, '-').toLowerCase();
+  if (nameEl && !nameEl.value) nameEl.value = haName;
 }
 
 async function submitNewUser() {
@@ -348,6 +386,7 @@ async function submitNewUser() {
     role:         document.getElementById('nuf-role').value,
     claude_md_template: document.getElementById('nuf-template').value,
     language: document.getElementById('nuf-language').value,
+    ha_user:      document.getElementById('nuf-ha-user')?.value || '',
   };
   st.textContent = '\u2026'; st.style.color = 'var(--muted)';
   try {

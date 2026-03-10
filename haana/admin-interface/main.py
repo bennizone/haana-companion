@@ -262,7 +262,7 @@ def _get_log_root() -> Path:
 
 LOG_ROOT = _get_log_root()
 
-INSTANCES = ["benni", "domi", "ha-assist", "ha-advanced"]  # statische Basis-Instanzen
+INSTANCES = ["ha-assist", "ha-advanced"]  # statische System-Instanzen
 
 def get_all_instances() -> list[str]:
     """Alle Instanzen: statische + dynamische User aus config.json."""
@@ -1654,7 +1654,8 @@ async def test_ha(request: Request):
     ha_url   = (body.get("ha_url")   or "").rstrip("/")
     ha_token = (body.get("ha_token") or "").strip()
     ha_url   = ha_url   or os.environ.get("HA_URL", "").rstrip("/")
-    ha_token = ha_token or os.environ.get("SUPERVISOR_TOKEN", "")
+    # Im Addon-Modus: SUPERVISOR_TOKEN hat Vorrang vor uebergebenem Token (der kann veraltet sein)
+    ha_token = os.environ.get("SUPERVISOR_TOKEN") or ha_token
     if not ha_url:
         return {"ok": False, "detail": "ha_url fehlt"}
     if not ha_token:
@@ -1691,7 +1692,8 @@ async def test_ha_mcp(request: Request):
 
     mcp_url = (body.get("mcp_url") or "").strip()
     token   = (body.get("token")   or "").strip()
-    token   = token or os.environ.get("SUPERVISOR_TOKEN", "")
+    # Im Addon-Modus: SUPERVISOR_TOKEN hat Vorrang vor uebergebenem Token (der kann veraltet sein)
+    token   = os.environ.get("SUPERVISOR_TOKEN") or token
 
     if not mcp_url:
         return {"ok": False, "detail": "MCP URL fehlt"}
@@ -1836,7 +1838,8 @@ async def ha_users():
     """Listet Home Assistant Person-Entitäten für User-Mapping auf."""
     cfg = load_config()
     ha_url   = (cfg.get("services", {}).get("ha_url", "") or os.environ.get("HA_URL", "")).rstrip("/")
-    ha_token = (cfg.get("services", {}).get("ha_token", "") or os.environ.get("SUPERVISOR_TOKEN", "")).strip()
+    # Im Addon-Modus: SUPERVISOR_TOKEN hat Vorrang vor gespeichertem Token (der kann veraltet sein)
+    ha_token = (os.environ.get("SUPERVISOR_TOKEN") or cfg.get("services", {}).get("ha_token", "")).strip()
     if not ha_url or not ha_token:
         return {"ok": False, "error": "HA URL oder Token nicht konfiguriert", "users": []}
     import httpx
@@ -2545,13 +2548,14 @@ def _find_free_port(existing_ports: list[int]) -> int:
 
 @app.get("/api/users")
 async def get_users():
-    """User-Liste mit Agent-Status."""
+    """User-Liste mit Agent-Status. System-User (ha-assist, ha-advanced) werden mit system=true markiert."""
     cfg = load_config()
     users = cfg.get("users", [])
     result = []
     for u in users:
         status = _agent_manager.agent_status(u["id"])
-        result.append({**u, "container_status": status})
+        is_system = u.get("id") in _SYSTEM_USER_IDS
+        result.append({**u, "container_status": status, "system": is_system})
     return result
 
 
