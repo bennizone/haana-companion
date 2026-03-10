@@ -633,6 +633,23 @@ def load_config() -> dict:
                     cfg["dream"].setdefault(k, v)
             _ensure_system_users(cfg)
             _ensure_user_defaults(cfg)
+            # Auto-repair: Provider mit null/fehlender ID bekommen eine gültige ID
+            providers = cfg.get("providers", [])
+            existing_ids = {p.get("id") for p in providers if p.get("id")}
+            repaired = False
+            for p in providers:
+                if not p.get("id"):
+                    ptype = p.get("type", "provider")
+                    n = 1
+                    while f"{ptype}-{n}" in existing_ids:
+                        n += 1
+                    new_id = f"{ptype}-{n}"
+                    p["id"] = new_id
+                    existing_ids.add(new_id)
+                    logger.info(f"Auto-repaired provider null-ID → {new_id}")
+                    repaired = True
+            if repaired:
+                save_config(cfg)
             return cfg
         except Exception:
             pass
@@ -3042,6 +3059,36 @@ def _complete_oauth_login_sync(code: str):
                         break
         except Exception as ex:
             logger.warning(f"setup-token: find failed: {ex}")
+        # .claude.json format (newer claude CLI writes here)
+        claude_json_paths = [
+            Path(tmp_home) / ".claude.json",
+            Path("/root") / ".claude.json",
+        ]
+        for cj_path in claude_json_paths:
+            if cj_path.is_file():
+                try:
+                    cj = json.loads(cj_path.read_text(encoding="utf-8"))
+                    oauth_acct = cj.get("oauthAccount", {})
+                    access_token = oauth_acct.get("accessToken", "")
+                    if access_token:
+                        logger.info(f"setup-token: Found token in {cj_path} (oauthAccount format)")
+                        creds_data = json.dumps({
+                            "claudeAiOauth": {
+                                "accessToken": access_token,
+                                "refreshToken": oauth_acct.get("refreshToken", ""),
+                                "expiresAt": oauth_acct.get("expiresAt", 0),
+                                "scopes": oauth_acct.get("scopes", ["user:inference", "user:profile"]),
+                            }
+                        })
+                        CLAUDE_AUTH_DIR.mkdir(parents=True, exist_ok=True)
+                        dest = CLAUDE_AUTH_DIR / ".credentials.json"
+                        dest.write_text(creds_data, encoding="utf-8")
+                        os.chmod(dest, 0o600)
+                        creds_saved = True
+                        logger.info(f"setup-token: Credentials from {cj_path} saved to {dest}")
+                        break
+                except Exception as ex2:
+                    logger.warning(f"setup-token: Failed to read {cj_path}: {ex2}")
 
     if tmp_creds.is_file():
         try:

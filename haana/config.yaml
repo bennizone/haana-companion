@@ -1,6 +1,6 @@
 name: "HAANA"
 description: "AI Household Assistant with persistent memory"
-version: "0.1.12"
+version: "0.1.13"
 slug: "haana"
 url: "https://github.com/bennizone/haana-dev"
 arch:
