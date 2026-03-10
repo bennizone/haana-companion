@@ -575,39 +575,63 @@ function onLlmProviderChange(i) {
 async function fetchModelsForLlm(i) {
   const st = document.getElementById(`llm-${i}-models-status`);
   try {
-    if (!cfg) { if (st) { st.textContent = '⚠ Config nicht geladen'; st.style.color = 'var(--yellow)'; } return; }
-    const providerId = document.getElementById(`llm-${i}-provider`)?.value;
-    const prov = (cfg.providers || []).find(p => p.id === providerId);
-    if (!prov) { if (st) { st.textContent = '⚠ Kein Provider ausgewählt'; st.style.color = 'var(--yellow)'; } return; }
-    if (st) { st.textContent = '\u2026'; st.style.color = 'var(--muted)'; }
-    const r = await fetch('/api/fetch-models', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ type: prov.type, url: prov.url, key: prov.key }),
-    });
-    const d = await r.json();
-    if (d.manual || !d.models?.length) {
-      if (st) { st.textContent = d.error ? '\u26a0 ' + d.error.substring(0,60) : '\u26a0 ' + t('config_llm.no_models_manual'); st.style.color = 'var(--yellow)'; }
+    if (!cfg) {
+      toast('Config nicht geladen', 'err');
+      if (st) { st.textContent = '⚠ Config nicht geladen'; st.style.color = 'var(--yellow)'; }
       return;
     }
-    if (st) { st.textContent = '\u2713 ' + d.models.length + ' Modelle'; st.style.color = 'var(--green)'; }
+    const providerId = document.getElementById(`llm-${i}-provider`)?.value;
+    const prov = (cfg.providers || []).find(p => p.id === providerId);
+    if (!prov) {
+      toast('Kein Provider ausgewählt (id=' + providerId + ')', 'err');
+      if (st) { st.textContent = '⚠ Kein Provider'; st.style.color = 'var(--yellow)'; }
+      return;
+    }
+    if (st) { st.textContent = '…'; st.style.color = 'var(--muted)'; }
+    let d;
+    try {
+      const r = await fetch('/api/fetch-models', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ type: prov.type, url: prov.url, key: prov.key }),
+      });
+      d = await r.json();
+    } catch(fetchErr) {
+      console.error('[fetchModelsForLlm] fetch error:', fetchErr);
+      d = { models: [], error: fetchErr.message };
+    }
+    const models = d.models || [];
+    if (st) {
+      if (models.length > 0) { st.textContent = '✓ ' + models.length + ' Modelle'; st.style.color = 'var(--green)'; }
+      else if (d.error) { st.textContent = '✗ ' + d.error.substring(0,50); st.style.color = 'var(--red)'; }
+      else { st.textContent = '⚠ Manuell eingeben'; st.style.color = 'var(--yellow)'; }
+    }
     const modelInput = document.getElementById(`llm-${i}-model`);
     const currentVal = modelInput?.value || '';
-    Modal.show({
-      title: 'Modell wählen',
-      body: `<div style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;">
-        ${d.models.map(m => `
-          <div onclick="document.getElementById('llm-${i}-model').value='${escAttr(m)}';Modal.close();"
+    let bodyHtml;
+    if (models.length > 0) {
+      bodyHtml = `<div style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;">
+        ${models.map(m => `
+          <div onclick="document.getElementById('llm-${i}-model').value='${escAttr(m)}';document.getElementById('llm-${i}-summary').textContent=_providerLabel(document.getElementById('llm-${i}-provider').value,cfg.providers||[])+' · '+'${escAttr(m)}';Modal.close();"
                style="padding:10px 14px;border:1px solid ${m===currentVal?'var(--accent)':'var(--border)'};
                       border-radius:var(--radius);cursor:pointer;background:${m===currentVal?'var(--accent-dim)':'var(--surface-hi)'};
                       color:var(--text);font-size:13px;">
             ${escHtml(m)}${m===currentVal?' <span style="color:var(--accent);font-size:11px;">✓</span>':''}
           </div>`).join('')}
-      </div>`,
+      </div>`;
+    } else {
+      const errMsg = d.error ? `<p style="color:var(--red);font-size:13px;">Fehler: ${escHtml(d.error)}</p>` : '';
+      bodyHtml = `${errMsg}<p style="color:var(--muted);font-size:13px;">Keine Modelle gefunden. Provider-Typ: <strong>${escHtml(prov.type)}</strong><br>Bitte Modell-ID manuell eingeben.</p>`;
+    }
+    Modal.show({
+      title: 'Modell wählen — ' + (prov.name || prov.type),
+      body: bodyHtml,
       hideCancel: false,
       cancelText: 'Schließen',
     });
   } catch(e) {
-    if (st) { st.textContent = '\u2717 ' + e.message.substring(0,60); st.style.color = 'var(--red)'; }
+    console.error('[fetchModelsForLlm] unexpected error:', e);
+    toast('Fehler beim Laden der Modelle: ' + e.message, 'err');
+    if (st) { st.textContent = '✗ ' + e.message.substring(0,60); st.style.color = 'var(--red)'; }
   }
 }
 
