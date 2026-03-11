@@ -100,6 +100,9 @@ def create_app(haana_url: str, token: str) -> web.Application:
         if request.headers.get("Upgrade", "").lower() == "websocket":
             return web.Response(status=501, text="WebSocket wird vom Companion nicht unterstuetzt")
 
+        # Ingress-Basis-Pfad aus HA-Header lesen
+        ingress_path = request.headers.get("X-Ingress-Path", "").rstrip("/")
+
         headers = {
             k: v for k, v in request.headers.items()
             if k.lower() not in ("host", "authorization", "content-length")
@@ -118,10 +121,30 @@ def create_app(haana_url: str, token: str) -> web.Application:
                     timeout=aiohttp.ClientTimeout(total=120),
                 ) as resp:
                     resp_body = await resp.read()
+                    content_type = resp.headers.get("Content-Type", "")
                     resp_headers = {
                         k: v for k, v in resp.headers.items()
-                        if k.lower() not in ("transfer-encoding", "content-encoding")
+                        if k.lower() not in ("transfer-encoding", "content-encoding", "content-length")
                     }
+
+                    # HTML-Antworten: absolute Pfade für Ingress rewriten
+                    if ingress_path and "text/html" in content_type:
+                        try:
+                            html = resp_body.decode("utf-8", errors="replace")
+                            # <base> Tag in <head> injizieren
+                            base_tag = f'<base href="{ingress_path}/">'
+                            html = html.replace("<head>", f"<head>{base_tag}", 1)
+                            # Absolute href/src Pfade rewriten (für ältere Browser ohne base-Tag Support)
+                            html = html.replace('href="/', f'href="{ingress_path}/')
+                            html = html.replace("href='/", f"href='{ingress_path}/")
+                            html = html.replace('src="/', f'src="{ingress_path}/')
+                            html = html.replace("src='/", f"src='{ingress_path}/")
+                            # fetch/axios URL-Rewrites im JS (für API-Calls)
+                            html = html.replace("fetch('/", f"fetch('{ingress_path}/")
+                            resp_body = html.encode("utf-8")
+                        except Exception as e:
+                            logger.warning(f"[proxy] HTML-Rewrite fehlgeschlagen: {e}")
+
                     return web.Response(
                         status=resp.status,
                         headers=resp_headers,
