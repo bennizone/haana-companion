@@ -1,5 +1,5 @@
 name: "HAANA"
-version: "1.0.5"
+version: "1.0.6"
 slug: haana-companion
 description: "Connects Home Assistant with the HAANA AI stack running on a Proxmox LXC."
 url: "https://github.com/bennizone/haana"

@@ -121,7 +121,16 @@ def create_app(haana_url: str, token: str) -> web.Application:
 
         redirect_url = f"{haana_url}/api/auth/sso?token={sso_token}"
         logger.info(f"SSO-Redirect → {haana_url}/api/auth/sso?token=***")
-        raise web.HTTPFound(redirect_url)
+        html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>HAANA</title></head>
+<body>
+<script>
+try {{ window.top.location = {repr(redirect_url)}; }}
+catch(e) {{ window.location = {repr(redirect_url)}; }}
+</script>
+<p>Weiterleitung zu HAANA... <a href="{redirect_url}">Hier klicken</a> falls nichts passiert.</p>
+</body></html>"""
+        return web.Response(content_type="text/html", text=html)
 
     app.router.add_route("*", "/", sso_handler)
     app.router.add_route("*", "/{path:.*}", sso_handler)
