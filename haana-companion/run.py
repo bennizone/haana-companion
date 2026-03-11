@@ -26,6 +26,29 @@ logger = logging.getLogger("haana-companion")
 
 OPTIONS_FILE = "/data/options.json"
 PORT = 8099
+SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
+
+
+async def _is_ha_admin(ha_user_token: str, session: aiohttp.ClientSession) -> bool:
+    """Prueft via HA Supervisor ob der User Admin-Rechte hat."""
+    if not ha_user_token or not SUPERVISOR_TOKEN:
+        # Kein HA-Kontext (z.B. direkte API-Nutzung) — durchlassen
+        return True
+    try:
+        async with session.post(
+            "http://supervisor/auth",
+            headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
+            json={"token": ha_user_token},
+            timeout=aiohttp.ClientTimeout(total=5),
+        ) as resp:
+            if resp.status != 200:
+                logger.warning(f"HA Auth-Check: HTTP {resp.status} — kein Admin")
+                return False
+            data = await resp.json()
+            return data.get("is_admin", False)
+    except Exception as e:
+        logger.warning(f"HA Auth-Check fehlgeschlagen: {e} — Zugriff verweigert")
+        return False
 
 
 def _load_options() -> dict:
@@ -102,6 +125,19 @@ def create_app(haana_url: str, token: str) -> web.Application:
 
         # Ingress-Basis-Pfad aus HA-Header lesen
         ingress_path = request.headers.get("X-Ingress-Path", "").rstrip("/")
+
+        # HA Admin-Check: nur wenn Request ueber HA Ingress kommt
+        if ingress_path:  # ingress_path ist bereits aus X-Ingress-Path gelesen
+            raw_auth = request.headers.get("Authorization", "")
+            ha_user_token = raw_auth.removeprefix("Bearer ").strip()
+            async with aiohttp.ClientSession() as auth_session:
+                if not await _is_ha_admin(ha_user_token, auth_session):
+                    logger.warning(f"Zugriff verweigert: User ist kein HA-Admin")
+                    return web.Response(
+                        status=403,
+                        content_type="text/html",
+                        text="<h2>Zugriff verweigert</h2><p>Nur Home Assistant Admins haben Zugriff auf HAANA.</p>",
+                    )
 
         headers = {
             k: v for k, v in request.headers.items()
