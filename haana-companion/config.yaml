@@ -1,5 +1,5 @@
-name: "HAANA Companion"
-version: "1.0.0"
+name: "HAANA"
+version: "1.0.1"
 slug: haana-companion
 description: "Connects Home Assistant with the HAANA AI stack running on a Proxmox LXC."
 url: "https://github.com/bennizone/haana"
@@ -11,6 +11,8 @@ startup: application
 boot: auto
 ingress: true
 ingress_port: 8099
+panel_icon: "mdi:brain"
+panel_title: "HAANA"
 homeassistant_api: true
 auth_api: true
 options:
