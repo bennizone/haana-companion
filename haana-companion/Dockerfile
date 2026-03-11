@@ -1,7 +1,6 @@
-ARG BUILD_FROM
-FROM $BUILD_FROM
+FROM python:3.11-alpine
 
-RUN apk add --no-cache python3 py3-aiohttp
+RUN pip install --no-cache-dir aiohttp
 
 COPY run.py /
-COPY rootfs /
+CMD ["python3", "/run.py"]
