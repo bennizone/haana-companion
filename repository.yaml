@@ -1,3 +1,5 @@
 name: HAANA Add-ons
-url: https://github.com/bennizone/haana
+url: https://github.com/bennizone/haana-companion
 maintainer: HAANA Project
+addons:
+  - haana-companion
