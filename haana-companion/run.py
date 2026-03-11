@@ -31,7 +31,7 @@ def _load_options() -> dict:
         return json.load(f)
 
 
-async def _handshake(haana_url: str, token: str, session: aiohttp.ClientSession) -> None:
+async def _handshake(haana_url: str, token: str, ha_url: str, session: aiohttp.ClientSession) -> None:
     """Ping + Register beim HAANA-Stack."""
     headers = {"Authorization": f"Bearer {token}"}
     try:
@@ -50,7 +50,7 @@ async def _handshake(haana_url: str, token: str, session: aiohttp.ClientSession)
         async with session.post(
             f"{haana_url}/api/companion/register",
             headers=headers,
-            json={"ha_url": "http://supervisor/core", "ha_token": supervisor_token},
+            json={"ha_url": ha_url, "ha_token": supervisor_token},
             timeout=aiohttp.ClientTimeout(total=5),
         ) as r:
             if r.status == 200:
@@ -146,6 +146,7 @@ async def main() -> None:
 
     haana_url = options.get("haana_url", "").rstrip("/")
     token = options.get("companion_token", "")
+    ha_url = options.get("ha_url", "").rstrip("/")
 
     if not haana_url:
         logger.error("haana_url ist nicht konfiguriert")
@@ -153,11 +154,13 @@ async def main() -> None:
     if not token:
         logger.error("companion_token ist nicht konfiguriert")
         sys.exit(1)
+    if not ha_url:
+        logger.warning("ha_url ist nicht konfiguriert — Home Assistant URL wird nicht an HAANA registriert")
 
     logger.info(f"HAANA Companion startet — HAANA_URL={haana_url} Port={PORT}")
 
     async with aiohttp.ClientSession() as session:
-        await _handshake(haana_url, token, session)
+        await _handshake(haana_url, token, ha_url, session)
 
     app = create_app(haana_url, token)
     runner = web.AppRunner(app)
