@@ -31,6 +31,29 @@ def _load_options() -> dict:
         return json.load(f)
 
 
+async def _detect_ha_url(session: aiohttp.ClientSession) -> str:
+    """Ermittelt die HA-URL automatisch über den Supervisor."""
+    if not SUPERVISOR_TOKEN:
+        return ""
+    try:
+        async with session.get(
+            "http://supervisor/core/info",
+            headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
+            timeout=aiohttp.ClientTimeout(total=5),
+        ) as resp:
+            if resp.status != 200:
+                return ""
+            data = await resp.json()
+            ip = data.get("data", {}).get("ip_address", "")
+            if ip:
+                url = f"http://{ip}:8123"
+                logger.info(f"HA-URL automatisch erkannt: {url}")
+                return url
+    except Exception as e:
+        logger.warning(f"HA-URL Erkennung fehlgeschlagen: {e}")
+    return ""
+
+
 async def _handshake(haana_url: str, token: str, ha_url: str, session: aiohttp.ClientSession) -> None:
     """Ping + Register beim HAANA-Stack."""
     headers = {"Authorization": f"Bearer {token}"}
@@ -147,6 +170,11 @@ async def main() -> None:
     haana_url = options.get("haana_url", "").rstrip("/")
     token = options.get("companion_token", "")
     ha_url = options.get("ha_url", "").rstrip("/")
+    if not ha_url:
+        async with aiohttp.ClientSession() as detect_session:
+            ha_url = await _detect_ha_url(detect_session)
+        if not ha_url:
+            logger.warning("ha_url nicht konfiguriert und automatische Erkennung fehlgeschlagen — HA-Integration deaktiviert")
 
     if not haana_url:
         logger.error("haana_url ist nicht konfiguriert")
@@ -154,8 +182,6 @@ async def main() -> None:
     if not token:
         logger.error("companion_token ist nicht konfiguriert")
         sys.exit(1)
-    if not ha_url:
-        logger.warning("ha_url ist nicht konfiguriert — Home Assistant URL wird nicht an HAANA registriert")
 
     logger.info(f"HAANA Companion startet — HAANA_URL={haana_url} Port={PORT}")
 
