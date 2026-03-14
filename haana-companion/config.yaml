@@ -1,8 +1,8 @@
 name: "HAANA"
-version: "1.0.10"
+version: "2.0.0"
 slug: haana-companion
 description: "Connects Home Assistant with the HAANA AI stack running on a Proxmox LXC."
-url: "https://github.com/bennizone/haana-companion"
+url: "https://github.com/alicezone/haana"
 arch:
   - amd64
   - aarch64
@@ -19,8 +19,6 @@ hassio_api: true
 options:
   haana_url: ""
   companion_token: ""
-  ha_url: ""
 schema:
   haana_url: str
   companion_token: str
-  ha_url: str
